@@ -17,6 +17,8 @@
     "test:load": "jest tests/load --ci --watchAll=false --forceExit --testTimeout=60000",
     "test:load:k6": "k6 run tests/load/api-load-test.js",
     "test:load:k6:short": "k6 run --duration=30s --vus=10 tests/load/api-load-test.js",
+    "test:load:k6:ci": "k6 run tests/load/api-load-test-ci.js",
+    "test:load:k6:demo": "k6 run tests/load/k6-demo.js",
     "wait-for-services": "node scripts/wait-for-services.js",
     "health-check": "node scripts/health-check.js",
     "type-check": "echo 'TypeScript type checking not configured (JavaScript project)' && exit 0",
