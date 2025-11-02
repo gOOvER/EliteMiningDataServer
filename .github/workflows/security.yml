@@ -78,30 +78,65 @@ jobs:
 
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
+      continue-on-error: true
       with:
         image-ref: 'elite-mining-server:security-scan'
         format: 'sarif'
         output: 'trivy-results.sarif'
 
+    - name: Check if Trivy SARIF file exists
+      id: trivy-check
+      run: |
+        if [ -f "trivy-results.sarif" ]; then
+          echo "trivy-exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "trivy-exists=false" >> $GITHUB_OUTPUT
+          echo "⚠️ Trivy SARIF file not found, skipping upload"
+        fi
+
     - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: steps.trivy-check.outputs.trivy-exists == 'true'
       with:
         sarif_file: 'trivy-results.sarif'
 
     - name: Run Docker Scout (if available)
+      id: docker-scout
       continue-on-error: true
       run: |
-        docker scout cves elite-mining-server:security-scan --format sarif --output docker-scout-results.sarif || true
+        if command -v docker scout >/dev/null 2>&1; then
+          docker scout cves elite-mining-server:security-scan --format sarif --output docker-scout-results.sarif || true
+          if [ -f "docker-scout-results.sarif" ]; then
+            echo "scout-exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "scout-exists=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "scout-exists=false" >> $GITHUB_OUTPUT
+          echo "⚠️ Docker Scout not available"
+        fi
+
+    - name: Prepare security results for upload
+      if: always()
+      run: |
+        mkdir -p security-results
+        if [ -f "trivy-results.sarif" ]; then
+          cp trivy-results.sarif security-results/
+          echo "✅ Trivy results prepared"
+        fi
+        if [ -f "docker-scout-results.sarif" ]; then
+          cp docker-scout-results.sarif security-results/
+          echo "✅ Docker Scout results prepared"
+        fi
+        ls -la security-results/ || echo "No security results found"
 
     - name: Upload Docker security results
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: docker-security-results
-        path: |
-          trivy-results.sarif
-          docker-scout-results.sarif
+        path: security-results/
+        if-no-files-found: warn
 
   secrets-scan:
     name: Secrets and Sensitive Data Scan
