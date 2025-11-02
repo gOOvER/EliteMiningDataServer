@@ -33,7 +33,12 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm ci
+      run: |
+        if [ -f package-lock.json ]; then
+          npm ci
+        else
+          npm install
+        fi
 
     - name: Run unit tests
       run: |
@@ -41,7 +46,7 @@ jobs:
         
     - name: Upload coverage to Codecov
       if: matrix.node-version == '22.x'
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: ./coverage/lcov.info
         flags: unittests
@@ -86,7 +91,12 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm ci
+      run: |
+        if [ -f package-lock.json ]; then
+          npm ci
+        else
+          npm install
+        fi
 
     - name: Setup test environment
       run: |
@@ -109,7 +119,7 @@ jobs:
         npm run test:integration -- --coverage --ci --watchAll=false
 
     - name: Upload integration test coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: ./coverage/lcov.info
         flags: integration
@@ -147,7 +157,7 @@ jobs:
 
     - name: Upload E2E test results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: e2e-test-results
         path: |
@@ -196,7 +206,7 @@ jobs:
 
     - name: Upload load test results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: load-test-results
         path: load-test-results.json
@@ -231,7 +241,7 @@ jobs:
 
     - name: Upload code quality results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: code-quality-results
         path: |
