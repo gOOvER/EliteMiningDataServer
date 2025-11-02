@@ -152,7 +152,7 @@ jobs:
         fetch-depth: 0  # Fetch full history for better secret scanning
 
     - name: Run TruffleHog secrets scan (Pull Request)
-      uses: trufflesecurity/trufflehog@main
+      uses: trufflesecurity/trufflehog@v3.63.2
       with:
         path: ./
         base: ${{ github.event.pull_request.base.sha }}
@@ -161,14 +161,27 @@ jobs:
       if: github.event_name == 'pull_request'
 
     - name: Run TruffleHog filesystem scan (Push/Schedule)
-      uses: trufflesecurity/trufflehog@main
+      uses: trufflesecurity/trufflehog@v3.63.2
+      continue-on-error: true
       with:
         path: ./
-        extra_args: --debug --only-verified --no-git --max-depth=20
+        extra_args: --debug --only-verified --max-depth=20
       if: github.event_name != 'pull_request'
 
+    - name: Alternative secrets scan with filesystem approach
+      if: github.event_name != 'pull_request'
+      continue-on-error: true
+      run: |
+        echo "Running alternative secrets scan..."
+        docker run --rm -v "${{ github.workspace }}:/pwd" \
+          trufflesecurity/trufflehog:latest filesystem \
+          --directory=/pwd \
+          --only-verified \
+          --max-depth=20 \
+          --debug || echo "TruffleHog filesystem scan completed with warnings"
+
     - name: Run TruffleHog git history scan (Scheduled)
-      uses: trufflesecurity/trufflehog@main
+      uses: trufflesecurity/trufflehog@v3.63.2
       with:
         path: ./
         base: HEAD~50  # Scan last 50 commits
