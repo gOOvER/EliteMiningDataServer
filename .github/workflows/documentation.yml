@@ -14,6 +14,12 @@ on:
       - 'docs/**'
   workflow_dispatch:
 
+# Permissions needed for GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 env:
   NODE_VERSION: '22.x'
 
@@ -444,13 +450,20 @@ jobs:
         git add docs/
         git commit -m "docs: Update generated documentation" || echo "No documentation changes to commit"
 
-    - name: Deploy documentation to GitHub Pages
+    - name: Setup Pages
       if: github.ref == 'refs/heads/main'
-      uses: peaceiris/actions-gh-pages@v4
+      uses: actions/configure-pages@v4
+
+    - name: Upload Pages artifact
+      if: github.ref == 'refs/heads/main'
+      uses: actions/upload-pages-artifact@v3
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./docs
-        force_orphan: true
+        path: ./docs
+
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main'
+      id: deployment
+      uses: actions/deploy-pages@v4
 
   docs-summary:
     name: Documentation Summary
