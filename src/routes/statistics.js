@@ -3843,9 +3843,11 @@ async function countIncomingMessagesByType(timeRange, services) {
     const startTime = new Date(Date.now() - timeRangeMs);
 
     // Simulate EDDN message type counting based on market data updates
-    const marketDataUpdates = await services.marketData.countDocuments({
-      timestamp: { $gte: startTime },
-    });
+    const marketDataUpdates = await services.database.db
+      .collection('marketData')
+      .countDocuments({
+        timestamp: { $gte: startTime },
+      });
 
     return {
       timeRange,
@@ -3896,9 +3898,11 @@ async function measureMessageProcessingMetrics(timeRange, services) {
     const timeRangeMs = parseTimeRange(timeRange);
 
     // Simulate processing metrics based on system performance
-    const messagesProcessed = await services.marketData.countDocuments({
-      timestamp: { $gte: new Date(Date.now() - timeRangeMs) },
-    });
+    const messagesProcessed = await services.database.db
+      .collection('marketData')
+      .countDocuments({
+        timestamp: { $gte: new Date(Date.now() - timeRangeMs) },
+      });
 
     const messagesPerSecond =
       timeRangeMs > 0
@@ -5396,6 +5400,47 @@ async function calculateMessageFilteringStatistics(timeRange, services) {
       rejected: 0,
       filterReasons: {},
       acceptanceRate: 0,
+    };
+  }
+}
+
+/**
+ * Monitor memory usage for message buffering
+ */
+async function monitorMemoryUsageForBuffering(services) {
+  try {
+    const memoryStats = process.memoryUsage();
+
+    return {
+      heapUsed: Math.round(memoryStats.heapUsed / 1024 / 1024), // MB
+      heapTotal: Math.round(memoryStats.heapTotal / 1024 / 1024), // MB
+      rss: Math.round(memoryStats.rss / 1024 / 1024), // MB
+      external: Math.round(memoryStats.external / 1024 / 1024), // MB
+      bufferSize: 0, // Default buffer size
+      usage: {
+        percentage: Math.round(
+          (memoryStats.heapUsed / memoryStats.heapTotal) * 100
+        ),
+        status:
+          memoryStats.heapUsed < memoryStats.heapTotal * 0.8
+            ? 'optimal'
+            : 'high',
+      },
+    };
+  } catch (error) {
+    logger.error('Memory usage monitoring error', {
+      error: error.message,
+    });
+    return {
+      heapUsed: 0,
+      heapTotal: 0,
+      rss: 0,
+      external: 0,
+      bufferSize: 0,
+      usage: {
+        percentage: 0,
+        status: 'unknown',
+      },
     };
   }
 }
