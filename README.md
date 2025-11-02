@@ -8,7 +8,7 @@ A high-performance Node.js server that aggregates and distributes Elite Dangerou
 ![Docker](https://img.shields.io/badge/Docker-Compose-blue)
 ![Traefik](https://img.shields.io/badge/Traefik-Reverse%20Proxy-blue)
 ![CrowdSec](https://img.shields.io/badge/CrowdSec-Security-red)
-![License](https://img.shields.io/badge/License-MIT-blue)
+![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 
 ## 🚀 Features
 
@@ -624,7 +624,7 @@ for i in {1..100}; do curl http://elite-mining.localhost/api/health; done
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
