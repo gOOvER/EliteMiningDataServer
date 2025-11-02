@@ -1,12 +1,12 @@
-const express = require('express');
-const router = express.Router();
-const logger = require('../services/logger');
+const express = require('express')
+const router = express.Router()
+const logger = require('../services/logger')
 
 // Get server status and statistics
 router.get('/', async (req, res) => {
   try {
-    const database = req.app.locals.database;
-    
+    const database = req.app.locals.database
+
     // Get database statistics
     const [
       systemCount,
@@ -20,16 +20,16 @@ router.get('/', async (req, res) => {
       database.getQuery('SELECT COUNT(DISTINCT commodity_name) as count FROM commodity_prices'),
       database.getQuery('SELECT COUNT(*) as count FROM mining_reports'),
       database.getQuery('SELECT COUNT(*) as count FROM mining_sites')
-    ]);
-    
+    ])
+
     // Get recent activity
     const recentActivity = await database.allQuery(`
       SELECT 'mining_report' as type, timestamp as last_activity, source
       FROM mining_reports 
       ORDER BY timestamp DESC 
       LIMIT 5
-    `);
-    
+    `)
+
     // Get data freshness
     const dataFreshness = await database.allQuery(`
       SELECT 
@@ -49,8 +49,8 @@ router.get('/', async (req, res) => {
         MIN(timestamp) as oldest_update
       FROM mining_reports
       WHERE timestamp > datetime('now', '-24 hours')
-    `);
-    
+    `)
+
     const status = {
       server: {
         status: 'online',
@@ -60,7 +60,7 @@ router.get('/', async (req, res) => {
         environment: process.env.NODE_ENV || 'development',
         timestamp: new Date().toISOString()
       },
-      
+
       database: {
         connected: true,
         systems: systemCount.count,
@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
         miningReports: miningReportCount.count,
         miningSites: miningSiteCount.count
       },
-      
+
       dataSources: {
         eddn: {
           status: 'connected', // This would be updated by EDDN client
@@ -84,30 +84,30 @@ router.get('/', async (req, res) => {
           apiKey: req.app.locals.edsmClient?.apiKey ? 'configured' : 'not configured'
         }
       },
-      
-      recentActivity: recentActivity,
-      dataFreshness: dataFreshness,
-      
+
+      recentActivity,
+      dataFreshness,
+
       memory: {
         used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
         total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
         external: Math.round(process.memoryUsage().external / 1024 / 1024)
       }
-    };
-    
-    res.json(status);
+    }
+
+    res.json(status)
   } catch (error) {
-    logger.error('Error fetching server status:', error);
-    res.status(500).json({ 
+    logger.error('Error fetching server status:', error)
+    res.status(500).json({
       server: {
         status: 'error',
         uptime: process.uptime(),
         timestamp: new Date().toISOString()
       },
-      error: 'Failed to fetch complete status' 
-    });
+      error: 'Failed to fetch complete status'
+    })
   }
-});
+})
 
 // Get EDDN statistics
 router.get('/eddn', async (req, res) => {
@@ -122,12 +122,12 @@ router.get('/eddn', async (req, res) => {
       uptime: 0,
       messagesPerSecond: 0,
       lastMessage: null
-    });
+    })
   } catch (error) {
-    logger.error('Error fetching EDDN status:', error);
-    res.status(500).json({ error: 'Failed to fetch EDDN status' });
+    logger.error('Error fetching EDDN status:', error)
+    res.status(500).json({ error: 'Failed to fetch EDDN status' })
   }
-});
+})
 
 // Get API endpoints documentation
 router.get('/endpoints', (req, res) => {
@@ -135,14 +135,14 @@ router.get('/endpoints', (req, res) => {
     description: 'Elite Dangerous Mining Data Server API Endpoints',
     version: '1.0.0',
     baseUrl: `${req.protocol}://${req.get('host')}/api`,
-    
+
     endpoints: {
       status: {
         'GET /status': 'Get server status and statistics',
         'GET /status/eddn': 'Get EDDN connection status',
         'GET /status/endpoints': 'Get this endpoints documentation'
       },
-      
+
       mining: {
         'GET /mining/sites/:systemName': 'Get mining sites in a system',
         'GET /mining/reports': 'Get recent mining reports (query: limit, system, material)',
@@ -150,7 +150,7 @@ router.get('/endpoints', (req, res) => {
         'GET /mining/opportunities/:systemName': 'Find mining opportunities near system (query: radius)',
         'GET /mining/hotspots': 'Get hotspot information (query: material)'
       },
-      
+
       systems: {
         'GET /systems/:systemName': 'Get system information',
         'GET /systems/search/:searchTerm': 'Search systems by name (query: limit)',
@@ -158,7 +158,7 @@ router.get('/endpoints', (req, res) => {
         'GET /systems/:system1/distance/:system2': 'Calculate distance between systems',
         'GET /systems/:systemName/stations': 'Get stations in system'
       },
-      
+
       commodities: {
         'GET /commodities/:commodityName/sell': 'Get best sell prices (query: limit)',
         'GET /commodities/:commodityName/buy': 'Get best buy prices (query: limit)',
@@ -169,7 +169,7 @@ router.get('/endpoints', (req, res) => {
         'GET /commodities/station/:stationName/:systemName': 'Get station market data'
       }
     },
-    
+
     websocket: {
       url: `ws://${req.get('host')}`,
       description: 'WebSocket connection for real-time data',
@@ -178,17 +178,17 @@ router.get('/endpoints', (req, res) => {
         'eddn - All EDDN data',
         'commodities - Commodity price updates'
       ],
-      
+
       messageTypes: {
         subscribe: { type: 'subscribe', channel: 'channel_name' },
         unsubscribe: { type: 'unsubscribe', channel: 'channel_name' },
         ping: { type: 'ping' }
       }
     }
-  };
-  
-  res.json(endpoints);
-});
+  }
+
+  res.json(endpoints)
+})
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -197,7 +197,7 @@ router.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     pid: process.pid
-  });
-});
+  })
+})
 
-module.exports = router;
+module.exports = router

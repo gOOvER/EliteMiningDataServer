@@ -1,70 +1,70 @@
-const logger = require('../services/logger');
+const logger = require('../services/logger')
 
 class DataProcessor {
-  constructor(database) {
-    this.database = database;
-    this.processingQueue = [];
-    this.isProcessing = false;
+  constructor (database) {
+    this.database = database
+    this.processingQueue = []
+    this.isProcessing = false
     this.statistics = {
       totalProcessed: 0,
       miningReports: 0,
       commodityUpdates: 0,
       systemUpdates: 0,
       errors: 0
-    };
-  }
-
-  async processEDDNMessage(data) {
-    try {
-      const schema = data.$schemaRef;
-      const message = data.message;
-      
-      if (schema.includes('commodity')) {
-        await this.processCommodityMessage(message);
-        this.statistics.commodityUpdates++;
-      } else if (schema.includes('journal')) {
-        await this.processJournalMessage(message);
-      }
-      
-      this.statistics.totalProcessed++;
-    } catch (error) {
-      logger.error('Error processing EDDN message:', error);
-      this.statistics.errors++;
     }
   }
 
-  async processCommodityMessage(message) {
+  async processEDDNMessage (data) {
+    try {
+      const schema = data.$schemaRef
+      const message = data.message
+
+      if (schema.includes('commodity')) {
+        await this.processCommodityMessage(message)
+        this.statistics.commodityUpdates++
+      } else if (schema.includes('journal')) {
+        await this.processJournalMessage(message)
+      }
+
+      this.statistics.totalProcessed++
+    } catch (error) {
+      logger.error('Error processing EDDN message:', error)
+      this.statistics.errors++
+    }
+  }
+
+  async processCommodityMessage (message) {
     try {
       // Extract station and system information
-      const stationName = message.stationName;
-      const systemName = message.systemName;
-      const timestamp = message.timestamp;
-      
+      const stationName = message.stationName
+      const systemName = message.systemName
+      const timestamp = message.timestamp
+
       // Store station if not exists
       await this.storeStation({
         name: stationName,
-        systemName: systemName,
+        systemName,
         stationType: message.stationType,
         distanceFromStar: message.distFromStarLS,
         hasMarket: true,
         source: 'eddn'
-      });
-      
+      })
+
       // Store system if not exists
       await this.storeSystem({
         name: systemName,
         coordinates: message.systemCoordinates,
         source: 'eddn'
-      });
-      
+      })
+
       // Process commodities
       if (message.commodities && Array.isArray(message.commodities)) {
         for (const commodity of message.commodities) {
           await this.database.insertCommodityPrice({
             commodityName: commodity.name,
             commodityId: commodity.id,
-            stationName: stationName,
-            systemName: systemName,
+            stationName,
+            systemName,
             buyPrice: commodity.buyPrice || 0,
             sellPrice: commodity.sellPrice || 0,
             supply: commodity.stock || 0,
@@ -72,49 +72,49 @@ class DataProcessor {
             distanceFromStar: message.distFromStarLS,
             stationType: message.stationType,
             source: 'eddn'
-          });
+          })
         }
       }
-      
-      logger.info(`Processed commodity data for ${stationName} in ${systemName}`);
+
+      logger.info(`Processed commodity data for ${stationName} in ${systemName}`)
     } catch (error) {
-      logger.error('Error processing commodity message:', error);
+      logger.error('Error processing commodity message:', error)
     }
   }
 
-  async processJournalMessage(message) {
+  async processJournalMessage (message) {
     try {
-      const event = message.event;
-      
+      const event = message.event
+
       switch (event) {
         case 'MiningRefined':
-          await this.processMiningRefined(message);
-          break;
-          
+          await this.processMiningRefined(message)
+          break
+
         case 'ProspectedAsteroid':
-          await this.processProspectedAsteroid(message);
-          break;
-          
+          await this.processProspectedAsteroid(message)
+          break
+
         case 'AsteroidCracked':
-          await this.processAsteroidCracked(message);
-          break;
-          
+          await this.processAsteroidCracked(message)
+          break
+
         case 'MarketSell':
-          await this.processMarketSell(message);
-          break;
-          
+          await this.processMarketSell(message)
+          break
+
         default:
           // Log unknown mining-related events for future implementation
           if (this.isMiningRelated(message)) {
-            logger.info(`Unknown mining event: ${event}`, { message });
+            logger.info(`Unknown mining event: ${event}`, { message })
           }
       }
     } catch (error) {
-      logger.error(`Error processing journal event ${message.event}:`, error);
+      logger.error(`Error processing journal event ${message.event}:`, error)
     }
   }
 
-  async processMiningRefined(message) {
+  async processMiningRefined (message) {
     await this.database.insertMiningReport({
       commanderName: null, // EDDN anonymizes commander names
       systemName: message.StarSystem,
@@ -122,43 +122,43 @@ class DataProcessor {
       materialRefined: message.Type,
       amount: 1,
       source: 'eddn'
-    });
-    
-    this.statistics.miningReports++;
-    logger.info(`Mining refined: ${message.Type} in ${message.StarSystem}`);
+    })
+
+    this.statistics.miningReports++
+    logger.info(`Mining refined: ${message.Type} in ${message.StarSystem}`)
   }
 
-  async processProspectedAsteroid(message) {
+  async processProspectedAsteroid (message) {
     // Store information about prospected asteroids
     // This could be used to build a database of asteroid compositions
     if (message.Materials && Array.isArray(message.Materials)) {
       for (const material of message.Materials) {
         // Could store prospect data for analysis
-        logger.debug(`Asteroid prospect: ${material.Name} (${material.Proportion}%) in ${message.StarSystem}`);
+        logger.debug(`Asteroid prospect: ${material.Name} (${material.Proportion}%) in ${message.StarSystem}`)
       }
     }
   }
 
-  async processAsteroidCracked(message) {
+  async processAsteroidCracked (message) {
     // Log asteroid cracking events
-    logger.info(`Asteroid cracked in ${message.StarSystem} at ${message.Body}`);
+    logger.info(`Asteroid cracked in ${message.StarSystem} at ${message.Body}`)
   }
 
-  async processMarketSell(message) {
+  async processMarketSell (message) {
     // If it's a mining commodity being sold, track it
     if (this.isMiningCommodity(message.Type)) {
-      logger.info(`Mining commodity sold: ${message.Count}x ${message.Type} for ${message.TotalSale} credits`);
+      logger.info(`Mining commodity sold: ${message.Count}x ${message.Type} for ${message.TotalSale} credits`)
     }
   }
 
-  async storeStation(stationData) {
+  async storeStation (stationData) {
     try {
       const sql = `
         INSERT OR IGNORE INTO stations 
         (name, system_name, station_type, distance_from_star, has_market, source)
         VALUES (?, ?, ?, ?, ?, ?)
-      `;
-      
+      `
+
       await this.database.runQuery(sql, [
         stationData.name,
         stationData.systemName,
@@ -166,49 +166,49 @@ class DataProcessor {
         stationData.distanceFromStar,
         stationData.hasMarket ? 1 : 0,
         stationData.source
-      ]);
+      ])
     } catch (error) {
-      logger.error('Error storing station:', error);
+      logger.error('Error storing station:', error)
     }
   }
 
-  async storeSystem(systemData) {
+  async storeSystem (systemData) {
     try {
       const sql = `
         INSERT OR IGNORE INTO systems 
         (name, coordinates_x, coordinates_y, coordinates_z, source)
         VALUES (?, ?, ?, ?, ?)
-      `;
-      
-      const coords = systemData.coordinates || {};
-      
+      `
+
+      const coords = systemData.coordinates || {}
+
       await this.database.runQuery(sql, [
         systemData.name,
         coords.x || null,
         coords.y || null,
         coords.z || null,
         systemData.source
-      ]);
-      
-      this.statistics.systemUpdates++;
+      ])
+
+      this.statistics.systemUpdates++
     } catch (error) {
-      logger.error('Error storing system:', error);
+      logger.error('Error storing system:', error)
     }
   }
 
-  isMiningRelated(message) {
+  isMiningRelated (message) {
     const miningEvents = [
       'MiningRefined',
-      'ProspectedAsteroid', 
+      'ProspectedAsteroid',
       'AsteroidCracked',
       'LaunchSRV',
       'DockSRV'
-    ];
-    
-    return miningEvents.includes(message.event);
+    ]
+
+    return miningEvents.includes(message.event)
   }
 
-  isMiningCommodity(commodityName) {
+  isMiningCommodity (commodityName) {
     const miningCommodities = [
       'Painite', 'Void Opals', 'Low Temperature Diamonds',
       'Alexandrite', 'Benitoite', 'Grandidierite', 'Monazite',
@@ -216,12 +216,12 @@ class DataProcessor {
       'Tritium', 'Platinum', 'Osmium', 'Gold', 'Silver',
       'Palladium', 'Bertrandite', 'Indite', 'Gallite',
       'Praseodymium', 'Samarium', 'Bromellite'
-    ];
-    
-    return miningCommodities.includes(commodityName);
+    ]
+
+    return miningCommodities.includes(commodityName)
   }
 
-  async aggregateHourlyData() {
+  async aggregateHourlyData () {
     try {
       // Aggregate mining reports by hour
       const hourlyMining = await this.database.allQuery(`
@@ -234,8 +234,8 @@ class DataProcessor {
         WHERE timestamp > datetime('now', '-24 hours')
         GROUP BY hour, material_refined, system_name
         ORDER BY hour DESC
-      `);
-      
+      `)
+
       // Aggregate commodity price changes
       const priceChanges = await this.database.allQuery(`
         SELECT 
@@ -249,20 +249,20 @@ class DataProcessor {
           AND sell_price > 0
         GROUP BY commodity_name, hour
         ORDER BY hour DESC
-      `);
-      
+      `)
+
       return {
         hourlyMining,
         priceChanges,
         generatedAt: new Date().toISOString()
-      };
+      }
     } catch (error) {
-      logger.error('Error aggregating hourly data:', error);
-      return null;
+      logger.error('Error aggregating hourly data:', error)
+      return null
     }
   }
 
-  async generateMiningHotspotAnalysis() {
+  async generateMiningHotspotAnalysis () {
     try {
       // Analyze mining reports to identify potential hotspots
       const hotspotAnalysis = await this.database.allQuery(`
@@ -279,14 +279,14 @@ class DataProcessor {
         GROUP BY system_name, body_name, material_refined
         HAVING mining_frequency >= 5
         ORDER BY mining_frequency DESC
-      `);
-      
+      `)
+
       // Group by system and material for hotspot detection
-      const systemHotspots = {};
-      
+      const systemHotspots = {}
+
       for (const report of hotspotAnalysis) {
-        const key = `${report.system_name}_${report.material_refined}`;
-        
+        const key = `${report.system_name}_${report.material_refined}`
+
         if (!systemHotspots[key]) {
           systemHotspots[key] = {
             systemName: report.system_name,
@@ -294,53 +294,53 @@ class DataProcessor {
             bodies: [],
             totalFrequency: 0,
             activeDays: new Set()
-          };
+          }
         }
-        
+
         systemHotspots[key].bodies.push({
           bodyName: report.body_name,
           frequency: report.mining_frequency,
           activeDays: report.active_days,
           firstReport: report.first_report,
           lastReport: report.last_report
-        });
-        
-        systemHotspots[key].totalFrequency += report.mining_frequency;
-        systemHotspots[key].activeDays.add(report.active_days);
+        })
+
+        systemHotspots[key].totalFrequency += report.mining_frequency
+        systemHotspots[key].activeDays.add(report.active_days)
       }
-      
+
       // Convert to array and sort by frequency
       const hotspots = Object.values(systemHotspots)
         .map(hotspot => ({
           ...hotspot,
           activeDays: Array.from(hotspot.activeDays).reduce((a, b) => a + b, 0)
         }))
-        .sort((a, b) => b.totalFrequency - a.totalFrequency);
-      
-      return hotspots;
+        .sort((a, b) => b.totalFrequency - a.totalFrequency)
+
+      return hotspots
     } catch (error) {
-      logger.error('Error generating hotspot analysis:', error);
-      return [];
+      logger.error('Error generating hotspot analysis:', error)
+      return []
     }
   }
 
-  getStatistics() {
+  getStatistics () {
     return {
       ...this.statistics,
       queueSize: this.processingQueue.length,
       isProcessing: this.isProcessing
-    };
+    }
   }
 
-  resetStatistics() {
+  resetStatistics () {
     this.statistics = {
       totalProcessed: 0,
       miningReports: 0,
       commodityUpdates: 0,
       systemUpdates: 0,
       errors: 0
-    };
+    }
   }
 }
 
-module.exports = DataProcessor;
+module.exports = DataProcessor

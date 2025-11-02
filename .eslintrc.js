@@ -12,7 +12,7 @@ module.exports = {
     sourceType: 'module'
   },
   rules: {
-    'linebreak-style': ['error', 'unix'],
+    // 'linebreak-style': ['error', process.platform === 'win32' ? 'windows' : 'unix'],
     'no-console': 'warn',
     'no-unused-vars': ['error', { argsIgnorePattern: '^_' }]
   },

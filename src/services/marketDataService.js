@@ -1,61 +1,61 @@
-const logger = require('./logger');
+const logger = require('./logger')
 
 /**
  * Market Data Service
  * Handles all market-related database operations and calculations
  */
 class MarketDataService {
-  constructor(mongoService, cacheManager = null) {
-    this.mongo = mongoService;
-    this.cache = cacheManager;
+  constructor (mongoService, cacheManager = null) {
+    this.mongo = mongoService
+    this.cache = cacheManager
     this.collections = {
       marketData: 'market_data',
-      stations: 'stations', 
+      stations: 'stations',
       systems: 'systems',
       commodities: 'commodities',
       prices: 'commodity_prices'
-    };
+    }
   }
 
   /**
    * Get commodity market data with filtering and aggregation
    */
-  async getCommodityData(commodityId, options = {}) {
+  async getCommodityData (commodityId, options = {}) {
     try {
-      const { systemName, stationName, maxAge = 24 } = options;
-      
+      const { systemName, stationName, maxAge = 24 } = options
+
       // Generate cache key
-      const cacheKey = `commodity:${commodityId}:${systemName || 'all'}:${stationName || 'all'}:${maxAge}`;
-      
+      const cacheKey = `commodity:${commodityId}:${systemName || 'all'}:${stationName || 'all'}:${maxAge}`
+
       // Try to get from cache if available
       if (this.cache) {
-        const cached = await this.cache.get(cacheKey);
+        const cached = await this.cache.get(cacheKey)
         if (cached) {
-          logger.debug(`Cache hit for commodity data: ${cacheKey}`);
-          return cached;
+          logger.debug(`Cache hit for commodity data: ${cacheKey}`)
+          return cached
         }
       }
-      
-      const maxAgeMs = maxAge * 60 * 60 * 1000; // Convert hours to milliseconds
-      const cutoffTime = new Date(Date.now() - maxAgeMs);
 
-      let pipeline = [
+      const maxAgeMs = maxAge * 60 * 60 * 1000 // Convert hours to milliseconds
+      const cutoffTime = new Date(Date.now() - maxAgeMs)
+
+      const pipeline = [
         {
           $match: {
-            commodityId: commodityId,
+            commodityId,
             timestamp: { $gte: cutoffTime }
           }
         }
-      ];
+      ]
 
       // Add system filter if provided
       if (systemName) {
-        pipeline[0].$match.systemName = new RegExp(systemName, 'i');
+        pipeline[0].$match.systemName = new RegExp(systemName, 'i')
       }
 
       // Add station filter if provided
       if (stationName) {
-        pipeline[0].$match.stationName = new RegExp(stationName, 'i');
+        pipeline[0].$match.stationName = new RegExp(stationName, 'i')
       }
 
       // Aggregate price data
@@ -82,15 +82,15 @@ class MarketDataService {
         {
           $limit: 50 // Limit results for performance
         }
-      );
+      )
 
-      const db = await this.mongo.getDatabase();
+      const db = await this.mongo.getDatabase()
       const results = await db.collection(this.collections.prices)
         .aggregate(pipeline)
-        .toArray();
+        .toArray()
 
       // Calculate overall statistics
-      const stats = this.calculatePriceStatistics(results);
+      const stats = this.calculatePriceStatistics(results)
 
       const result = {
         commodity: commodityId,
@@ -112,44 +112,43 @@ class MarketDataService {
           freshness: this.calculateFreshness(result.lastUpdated)
         })),
         totalLocations: results.length,
-        maxAge: maxAge
-      };
+        maxAge
+      }
 
       // Cache the result if cache manager is available
       if (this.cache) {
-        await this.cache.set(cacheKey, result, 300); // Cache for 5 minutes
-        logger.debug(`Cached commodity data: ${cacheKey}`);
+        await this.cache.set(cacheKey, result, 300) // Cache for 5 minutes
+        logger.debug(`Cached commodity data: ${cacheKey}`)
       }
 
-      return result;
-
+      return result
     } catch (error) {
-      logger.error('Error fetching commodity data:', error);
-      throw new Error(`Failed to fetch commodity data: ${error.message}`);
+      logger.error('Error fetching commodity data:', error)
+      throw new Error(`Failed to fetch commodity data: ${error.message}`)
     }
   }
 
   /**
    * Calculate trading routes between systems
    */
-  async calculateTradingRoutes(startSystem, options = {}) {
+  async calculateTradingRoutes (startSystem, options = {}) {
     try {
-      const { maxJumps = 20, cargoCapacity = 100, minProfit = 1000 } = options;
+      const { maxJumps = 20, cargoCapacity = 100, minProfit = 1000 } = options
 
       // First, get systems within jump range
-      const nearbySystemsMap = await this.getNearbySystemsWithCoordinates(startSystem, maxJumps);
-      const nearbySystemNames = Array.from(nearbySystemsMap.keys());
+      const nearbySystemsMap = await this.getNearbySystemsWithCoordinates(startSystem, maxJumps)
+      const nearbySystemNames = Array.from(nearbySystemsMap.keys())
 
       if (nearbySystemNames.length === 0) {
         return {
           startSystem,
           routes: [],
           message: 'No nearby systems found or start system coordinates unavailable'
-        };
+        }
       }
 
       // Get market data for all nearby systems
-      const marketData = await this.getMarketDataForSystems(nearbySystemNames);
+      const marketData = await this.getMarketDataForSystems(nearbySystemNames)
 
       // Calculate profitable routes
       const routes = this.calculateProfitableRoutes(
@@ -157,7 +156,7 @@ class MarketDataService {
         marketData,
         nearbySystemsMap,
         { cargoCapacity, minProfit }
-      );
+      )
 
       return {
         startSystem,
@@ -167,21 +166,20 @@ class MarketDataService {
         systemsAnalyzed: nearbySystemNames.length,
         routes: routes.slice(0, 10), // Top 10 routes
         totalRoutes: routes.length
-      };
-
+      }
     } catch (error) {
-      logger.error('Error calculating trading routes:', error);
-      throw new Error(`Failed to calculate trading routes: ${error.message}`);
+      logger.error('Error calculating trading routes:', error)
+      throw new Error(`Failed to calculate trading routes: ${error.message}`)
     }
   }
 
   /**
    * Get market trends for commodities
    */
-  async getMarketTrends(commodityName, timeRange = '7d') {
+  async getMarketTrends (commodityName, timeRange = '7d') {
     try {
-      const days = this.parseTimeRange(timeRange);
-      const startDate = new Date(Date.now() - (days * 24 * 60 * 60 * 1000));
+      const days = this.parseTimeRange(timeRange)
+      const startDate = new Date(Date.now() - (days * 24 * 60 * 60 * 1000))
 
       const pipeline = [
         {
@@ -209,16 +207,16 @@ class MarketDataService {
         {
           $sort: { '_id.date': 1 }
         }
-      ];
+      ]
 
-      const db = await this.mongo.getDatabase();
+      const db = await this.mongo.getDatabase()
       const results = await db.collection(this.collections.prices)
         .aggregate(pipeline)
-        .toArray();
+        .toArray()
 
       // Group by commodity and calculate trends
-      const trendsBycommodity = this.groupTrendsBycommodity(results);
-      const trendsWithAnalysis = this.analyzeTrends(trendsBycommodity);
+      const trendsBycommodity = this.groupTrendsBycommodity(results)
+      const trendsWithAnalysis = this.analyzeTrends(trendsBycommodity)
 
       return {
         commodity: commodityName || 'all',
@@ -226,25 +224,24 @@ class MarketDataService {
         period: `${days} days`,
         trends: trendsWithAnalysis,
         dataPoints: results.length
-      };
-
+      }
     } catch (error) {
-      logger.error('Error fetching market trends:', error);
-      throw new Error(`Failed to fetch market trends: ${error.message}`);
+      logger.error('Error fetching market trends:', error)
+      throw new Error(`Failed to fetch market trends: ${error.message}`)
     }
   }
 
   /**
    * Get complete station market data
    */
-  async getStationMarketData(systemName, stationName) {
+  async getStationMarketData (systemName, stationName) {
     try {
       const pipeline = [
         {
           $match: {
             systemName: new RegExp(systemName, 'i'),
             stationName: new RegExp(stationName, 'i'),
-            timestamp: { 
+            timestamp: {
               $gte: new Date(Date.now() - (24 * 60 * 60 * 1000)) // Last 24 hours
             }
           }
@@ -265,20 +262,20 @@ class MarketDataService {
         {
           $sort: { _id: 1 }
         }
-      ];
+      ]
 
-      const db = await this.mongo.getDatabase();
+      const db = await this.mongo.getDatabase()
       const commodities = await db.collection(this.collections.prices)
         .aggregate(pipeline)
-        .toArray();
+        .toArray()
 
       // Get station information
-      const stationInfo = await this.getStationInfo(systemName, stationName);
+      const stationInfo = await this.getStationInfo(systemName, stationName)
 
       return {
         system: systemName,
         station: stationName,
-        stationInfo: stationInfo,
+        stationInfo,
         commodities: commodities.map(commodity => ({
           name: commodity._id,
           buyPrice: commodity.buyPrice || 0,
@@ -291,48 +288,48 @@ class MarketDataService {
         })),
         totalCommodities: commodities.length,
         lastUpdated: new Date().toISOString()
-      };
-
+      }
     } catch (error) {
-      logger.error('Error fetching station market data:', error);
-      throw new Error(`Failed to fetch station market data: ${error.message}`);
+      logger.error('Error fetching station market data:', error)
+      throw new Error(`Failed to fetch station market data: ${error.message}`)
     }
   }
 
   // Helper methods
 
-  calculatePriceStatistics(results) {
-    if (results.length === 0) return null;
+  calculatePriceStatistics (results) {
+    if (results.length === 0) return null
 
-    const buyPrices = results.map(r => r.avgBuyPrice).filter(p => p > 0);
-    const sellPrices = results.map(r => r.avgSellPrice).filter(p => p > 0);
+    const buyPrices = results.map(r => r.avgBuyPrice).filter(p => p > 0)
+    const sellPrices = results.map(r => r.avgSellPrice).filter(p => p > 0)
 
     return {
       avgBuyPrice: buyPrices.length > 0 ? Math.round(buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length) : 0,
       avgSellPrice: sellPrices.length > 0 ? Math.round(sellPrices.reduce((a, b) => a + b, 0) / sellPrices.length) : 0,
-      priceSpread: sellPrices.length > 0 && buyPrices.length > 0 ? 
-        Math.round(Math.max(...sellPrices) - Math.min(...buyPrices)) : 0,
+      priceSpread: sellPrices.length > 0 && buyPrices.length > 0
+        ? Math.round(Math.max(...sellPrices) - Math.min(...buyPrices))
+        : 0,
       locations: results.length
-    };
+    }
   }
 
-  async getNearbySystemsWithCoordinates(systemName, maxJumps) {
+  async getNearbySystemsWithCoordinates (systemName, maxJumps) {
     // This would integrate with EDSM API to get system coordinates
     // For now, return a mock implementation
-    const systemsMap = new Map();
-    systemsMap.set('Sol', { x: 0, y: 0, z: 0, distance: 0 });
-    systemsMap.set('Alpha Centauri', { x: 3.03, y: -0.01, z: 3.15, distance: 4.3 });
-    return systemsMap;
+    const systemsMap = new Map()
+    systemsMap.set('Sol', { x: 0, y: 0, z: 0, distance: 0 })
+    systemsMap.set('Alpha Centauri', { x: 3.03, y: -0.01, z: 3.15, distance: 4.3 })
+    return systemsMap
   }
 
-  async getMarketDataForSystems(systemNames) {
-    const db = await this.mongo.getDatabase();
+  async getMarketDataForSystems (systemNames) {
+    const db = await this.mongo.getDatabase()
     return await db.collection(this.collections.prices)
       .find({ systemName: { $in: systemNames } })
-      .toArray();
+      .toArray()
   }
 
-  calculateProfitableRoutes(startSystem, marketData, systemsMap, options) {
+  calculateProfitableRoutes (startSystem, marketData, systemsMap, options) {
     // Complex route calculation logic would go here
     // For now, return a mock profitable route
     return [{
@@ -346,45 +343,45 @@ class MarketDataService {
       totalProfit: 3000 * options.cargoCapacity,
       distance: 4.3,
       jumps: 1
-    }];
+    }]
   }
 
-  parseTimeRange(timeRange) {
-    const match = timeRange.match(/(\d+)([dwmy])/);
-    if (!match) return 7; // Default to 7 days
+  parseTimeRange (timeRange) {
+    const match = timeRange.match(/(\d+)([dwmy])/)
+    if (!match) return 7 // Default to 7 days
 
-    const [, number, unit] = match;
-    const multipliers = { d: 1, w: 7, m: 30, y: 365 };
-    return parseInt(number) * (multipliers[unit] || 1);
+    const [, number, unit] = match
+    const multipliers = { d: 1, w: 7, m: 30, y: 365 }
+    return parseInt(number) * (multipliers[unit] || 1)
   }
 
-  groupTrendsBycommodity(results) {
-    const grouped = {};
+  groupTrendsBycommodity (results) {
+    const grouped = {}
     results.forEach(result => {
-      const commodity = result._id.commodity;
+      const commodity = result._id.commodity
       if (!grouped[commodity]) {
-        grouped[commodity] = [];
+        grouped[commodity] = []
       }
       grouped[commodity].push({
         date: result._id.date,
         price: result.avgPrice,
         volume: result.volume,
         dataPoints: result.dataPoints
-      });
-    });
-    return grouped;
+      })
+    })
+    return grouped
   }
 
-  analyzeTrends(trendsBycommodity) {
-    const analyzed = [];
+  analyzeTrends (trendsBycommodity) {
+    const analyzed = []
     for (const [commodity, trends] of Object.entries(trendsBycommodity)) {
-      if (trends.length < 2) continue;
+      if (trends.length < 2) continue
 
-      const prices = trends.map(t => t.price);
-      const firstPrice = prices[0];
-      const lastPrice = prices[prices.length - 1];
-      const priceChange = lastPrice - firstPrice;
-      const priceChangePercent = (priceChange / firstPrice) * 100;
+      const prices = trends.map(t => t.price)
+      const firstPrice = prices[0]
+      const lastPrice = prices[prices.length - 1]
+      const priceChange = lastPrice - firstPrice
+      const priceChangePercent = (priceChange / firstPrice) * 100
 
       analyzed.push({
         commodity,
@@ -396,42 +393,42 @@ class MarketDataService {
           volatility: this.calculateVolatility(prices),
           avgPrice: Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
         }
-      });
+      })
     }
-    return analyzed;
+    return analyzed
   }
 
-  calculateVolatility(prices) {
-    if (prices.length < 2) return 0;
-    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
-    const variance = prices.reduce((sum, price) => sum + Math.pow(price - avg, 2), 0) / prices.length;
-    return Math.round(Math.sqrt(variance));
+  calculateVolatility (prices) {
+    if (prices.length < 2) return 0
+    const avg = prices.reduce((a, b) => a + b, 0) / prices.length
+    const variance = prices.reduce((sum, price) => sum + Math.pow(price - avg, 2), 0) / prices.length
+    return Math.round(Math.sqrt(variance))
   }
 
-  async getStationInfo(systemName, stationName) {
+  async getStationInfo (systemName, stationName) {
     // This would query station details from database
     return {
       type: 'Coriolis Starport',
       services: ['Market', 'Shipyard', 'Outfitting', 'Repair'],
       landingPadSize: 'Large',
       distanceFromStar: 'Unknown'
-    };
+    }
   }
 
-  calculateProfit(buyPrice, sellPrice) {
-    if (!buyPrice || !sellPrice) return 0;
-    return Math.max(0, sellPrice - buyPrice);
+  calculateProfit (buyPrice, sellPrice) {
+    if (!buyPrice || !sellPrice) return 0
+    return Math.max(0, sellPrice - buyPrice)
   }
 
-  calculateFreshness(timestamp) {
-    const ageMs = Date.now() - new Date(timestamp).getTime();
-    const ageHours = ageMs / (1000 * 60 * 60);
-    
-    if (ageHours < 1) return 'Fresh';
-    if (ageHours < 6) return 'Recent';
-    if (ageHours < 24) return 'Moderate';
-    return 'Stale';
+  calculateFreshness (timestamp) {
+    const ageMs = Date.now() - new Date(timestamp).getTime()
+    const ageHours = ageMs / (1000 * 60 * 60)
+
+    if (ageHours < 1) return 'Fresh'
+    if (ageHours < 6) return 'Recent'
+    if (ageHours < 24) return 'Moderate'
+    return 'Stale'
   }
 }
 
-module.exports = MarketDataService;
+module.exports = MarketDataService
