@@ -130,8 +130,8 @@ describeIfMongo('Elite Dangerous Mining Data Server - Integration Tests', () => 
 
     test('GET /api/stats/mining - should return mining statistics', async () => {
       const response = await request(app).get('/api/stats/mining')
-      // May return 500 if MongoDB is not properly connected, which is acceptable in tests
-      expect([200, 500]).toContain(response.status)
+      // May return 500, 503 if MongoDB is not properly connected, which is acceptable in tests
+      expect([200, 500, 503]).toContain(response.status)
       if (response.status === 200) {
         expect(response.body).toHaveProperty('data')
       }

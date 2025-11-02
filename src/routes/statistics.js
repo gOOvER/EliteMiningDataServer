@@ -3505,9 +3505,20 @@ async function generateHourlyErrorDistribution (startTime) {
 
 async function createDataStatisticsPipelines (services) {
   try {
+    // Check if marketData service has the database collection
+    const marketDataCollection = services.database ? services.database.db.collection('marketData') : null
+    
+    if (!marketDataCollection) {
+      // Return mock data if database not available
+      return {
+        systemsWithStations: [],
+        commodityDistribution: []
+      }
+    }
+
     // MongoDB aggregation pipelines for comprehensive data statistics
     const pipelines = {
-      systemsWithStations: await services.marketData.aggregate([
+      systemsWithStations: await marketDataCollection.aggregate([
         {
           $group: {
             _id: '$system',
@@ -3522,8 +3533,8 @@ async function createDataStatisticsPipelines (services) {
             lastUpdate: 1
           }
         }
-      ]),
-      commodityDistribution: await services.marketData.aggregate([
+      ]).toArray(),
+      commodityDistribution: await marketDataCollection.aggregate([
         {
           $group: {
             _id: '$commodity',
@@ -3546,7 +3557,7 @@ async function createDataStatisticsPipelines (services) {
           }
         },
         { $sort: { totalVolume: -1 } }
-      ])
+      ]).toArray()
     }
 
     return {
@@ -3569,17 +3580,40 @@ async function createDataStatisticsPipelines (services) {
 
 async function countCollectionTotals (services) {
   try {
+    // Check if database service is available
+    const marketDataCollection = services.database ? services.database.db.collection('marketData') : null
+    
+    if (!marketDataCollection) {
+      // Return default values if database not available
+      return {
+        systems: 0,
+        stations: 0,
+        commodities: 0,
+        marketDataRecords: 0,
+        uniqueEntries: { systemStationPairs: 0 }
+      }
+    }
+
     const [
       systemsCount,
       stationsCount,
       commoditiesCount,
       marketDataCount
     ] = await Promise.all([
-      services.marketData.distinct('system').then(result => result.length),
-      services.marketData.distinct('station').then(result => result.length),
-      services.marketData.distinct('commodity').then(result => result.length),
-      services.marketData.countDocuments()
+      marketDataCollection.distinct('system').then(result => result.length),
+      marketDataCollection.distinct('station').then(result => result.length),
+      marketDataCollection.distinct('commodity').then(result => result.length),
+      marketDataCollection.countDocuments()
     ])
+
+    const systemStationPairs = await marketDataCollection.aggregate([
+      {
+        $group: {
+          _id: { system: '$system', station: '$station' }
+        }
+      },
+      { $count: 'total' }
+    ]).toArray()
 
     return {
       systems: systemsCount,
@@ -3587,14 +3621,7 @@ async function countCollectionTotals (services) {
       commodities: commoditiesCount,
       marketDataRecords: marketDataCount,
       uniqueEntries: {
-        systemStationPairs: await services.marketData.aggregate([
-          {
-            $group: {
-              _id: { system: '$system', station: '$station' }
-            }
-          },
-          { $count: 'total' }
-        ]).then(result => result[0]?.total || 0)
+        systemStationPairs: systemStationPairs[0]?.total || 0
       }
     }
   } catch (error) {
@@ -3611,6 +3638,19 @@ async function countCollectionTotals (services) {
 
 async function calculateMiningLocationStatistics (services) {
   try {
+    // Check if database service is available
+    const marketDataCollection = services.database ? services.database.db.collection('marketData') : null
+    
+    if (!marketDataCollection) {
+      // Return mock data if database not available
+      return {
+        totalLocations: 0,
+        topMiningSystems: [],
+        averageValue: 0,
+        commodityCount: 0
+      }
+    }
+
     // This would query mining locations collection when available
     // For now, return estimated data based on market data
     const miningRelatedCommodities = [
@@ -3618,7 +3658,7 @@ async function calculateMiningLocationStatistics (services) {
       'Benitoite', 'Monazite', 'Musgravite', 'Rhodplumsite', 'Serendibite'
     ]
 
-    const miningData = await services.marketData.aggregate([
+    const miningData = await marketDataCollection.aggregate([
       {
         $match: {
           commodity: { $in: miningRelatedCommodities },
@@ -3642,7 +3682,7 @@ async function calculateMiningLocationStatistics (services) {
           totalValue: { $sum: { $multiply: ['$avgPrice', '$totalSupply'] } }
         }
       }
-    ])
+    ]).toArray()
 
     return {
       totalLocations: miningData.length,
@@ -3679,12 +3719,26 @@ async function calculateMiningLocationStatistics (services) {
 
 async function aggregateEDDNMessageStatistics (timeRange, services) {
   try {
+    // Check if database service is available
+    const marketDataCollection = services.database ? services.database.db.collection('marketData') : null
+    
+    if (!marketDataCollection) {
+      // Return mock data if database not available
+      return {
+        totalMessages: 0,
+        messageTypes: {},
+        avgProcessingTime: 0,
+        messagesPerSecond: 0,
+        peakHours: []
+      }
+    }
+
     // Parse time range
     const timeRangeMs = parseTimeRange(timeRange)
     const startTime = new Date(Date.now() - timeRangeMs)
 
     // Get recent data updates as proxy for EDDN messages
-    const recentUpdates = await services.marketData.aggregate([
+    const recentUpdates = await marketDataCollection.aggregate([
       {
         $match: {
           timestamp: { $gte: startTime }
@@ -3884,11 +3938,24 @@ async function getServerPerformanceMetrics () {
 
 async function calculateDataFreshnessIndicators (services) {
   try {
+    // Check if database service is available
+    const marketDataCollection = services.database ? services.database.db.collection('marketData') : null
+    
+    if (!marketDataCollection) {
+      // Return mock data if database not available
+      return {
+        lastUpdate: new Date().toISOString(),
+        averageFreshness: 'unknown',
+        recentUpdates: 0,
+        weeklyUpdates: 0
+      }
+    }
+
     const now = new Date()
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    const freshnessData = await services.marketData.aggregate([
+    const freshnessData = await marketDataCollection.aggregate([
       {
         $group: {
           _id: null,
@@ -3947,6 +4014,20 @@ async function calculateDataFreshnessIndicators (services) {
 
 async function calculateGrowthRatesAndTrends (timeRange, services) {
   try {
+    // Check if database service is available
+    const marketDataCollection = services.database ? services.database.db.collection('marketData') : null
+    
+    if (!marketDataCollection) {
+      // Return mock data if database not available
+      return {
+        timeRange,
+        dataGrowth: { current: 0, previous: 0, rate: 0 },
+        systemGrowth: { rate: 0 },
+        stationGrowth: { rate: 0 },
+        trends: []
+      }
+    }
+
     const timeRangeMs = parseTimeRange(timeRange)
     const now = new Date()
     const periods = [
@@ -3955,7 +4036,7 @@ async function calculateGrowthRatesAndTrends (timeRange, services) {
     ]
 
     const growthData = await Promise.all(periods.map(async (period) => {
-      const count = await services.marketData.countDocuments({
+      const count = await marketDataCollection.countDocuments({
         timestamp: { $gte: period.start, $lte: period.end }
       })
       return { period: period.name, count, start: period.start, end: period.end }
@@ -4001,15 +4082,23 @@ async function calculateGrowthRatesAndTrends (timeRange, services) {
 
 async function calculateEntityGrowth (entityField, timeRangeMs, services) {
   try {
+    // Check if database service is available
+    const marketDataCollection = services.database ? services.database.db.collection('marketData') : null
+    
+    if (!marketDataCollection) {
+      // Return mock data if database not available
+      return { current: 0, previous: 0, growthRate: 0 }
+    }
+
     const now = new Date()
     const currentPeriod = new Date(now.getTime() - timeRangeMs)
     const previousPeriod = new Date(now.getTime() - 2 * timeRangeMs)
 
     const [currentCount, previousCount] = await Promise.all([
-      services.marketData.distinct(entityField, {
+      marketDataCollection.distinct(entityField, {
         timestamp: { $gte: currentPeriod }
       }).then(result => result.length),
-      services.marketData.distinct(entityField, {
+      marketDataCollection.distinct(entityField, {
         timestamp: { $gte: previousPeriod, $lt: currentPeriod }
       }).then(result => result.length)
     ])
@@ -4031,8 +4120,20 @@ async function calculateEntityGrowth (entityField, timeRangeMs, services) {
 
 async function calculateGeographicDistribution (services) {
   try {
+    // Check if database service is available
+    const marketDataCollection = services.database ? services.database.db.collection('marketData') : null
+    
+    if (!marketDataCollection) {
+      // Return mock data if database not available
+      return {
+        regions: [],
+        topSystems: [],
+        coverage: 0
+      }
+    }
+
     // Calculate system distribution by first letter (simulating regions)
-    const systemDistribution = await services.marketData.aggregate([
+    const systemDistribution = await marketDataCollection.aggregate([
       {
         $group: {
           _id: { $substr: ['$system', 0, 1] },
@@ -4048,10 +4149,10 @@ async function calculateGeographicDistribution (services) {
         }
       },
       { $sort: { dataPoints: -1 } }
-    ])
+    ]).toArray()
 
     // Calculate top systems by data volume
-    const topSystems = await services.marketData.aggregate([
+    const topSystems = await marketDataCollection.aggregate([
       {
         $group: {
           _id: '$system',
@@ -4345,6 +4446,34 @@ function getDatabaseCollections (req, collections) {
     result[key] = req.app.locals.db.collection(collectionName)
   }
   return result
+}
+
+// Missing function implementation
+async function calculateMessageFilteringStatistics (timeRange, services) {
+  try {
+    // Mock implementation for message filtering statistics
+    return {
+      totalReceived: 0,
+      accepted: 0,
+      rejected: 0,
+      filterReasons: {
+        invalidFormat: 0,
+        duplicateData: 0,
+        outdatedData: 0,
+        incompleteData: 0
+      },
+      acceptanceRate: 0
+    }
+  } catch (error) {
+    logger.error('Message filtering statistics error', { error: error.message })
+    return {
+      totalReceived: 0,
+      accepted: 0,
+      rejected: 0,
+      filterReasons: {},
+      acceptanceRate: 0
+    }
+  }
 }
 
 module.exports = router

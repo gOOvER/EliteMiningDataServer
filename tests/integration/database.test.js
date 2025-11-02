@@ -22,23 +22,36 @@ describeIfMongo('Database Integration', () => {
     // Connect to test database
     if (!mongoose.connection.readyState) {
       try {
-        // Try with authentication first (CI environment)
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://testuser:testpass123@localhost:27017/elite_mining_test?authSource=admin', {
-          serverSelectionTimeoutMS: 5000,
-          connectTimeoutMS: 5000
-        })
-        mongoConnected = true
-      } catch (authError) {
-        // If authentication fails, try without authentication (local fallback)
-        try {
+        // In CI environment, try without authentication first (GitHub Actions MongoDB)
+        if (process.env.CI || process.env.GITHUB_ACTIONS) {
           await mongoose.connect('mongodb://localhost:27017/elite_mining_test', {
             serverSelectionTimeoutMS: 5000,
             connectTimeoutMS: 5000
           })
           mongoConnected = true
-        } catch (noAuthError) {
+        } else {
+          // Local environment - try with authentication first
+          await mongoose.connect(process.env.MONGODB_URI || 'mongodb://testuser:testpass123@localhost:27017/elite_mining_test?authSource=admin', {
+            serverSelectionTimeoutMS: 5000,
+            connectTimeoutMS: 5000
+          })
+          mongoConnected = true
+        }
+      } catch (firstError) {
+        // If first attempt fails, try the other method
+        try {
+          const fallbackUri = (process.env.CI || process.env.GITHUB_ACTIONS)
+            ? (process.env.MONGODB_URI || 'mongodb://testuser:testpass123@localhost:27017/elite_mining_test?authSource=admin')
+            : 'mongodb://localhost:27017/elite_mining_test'
+          
+          await mongoose.connect(fallbackUri, {
+            serverSelectionTimeoutMS: 5000,
+            connectTimeoutMS: 5000
+          })
+          mongoConnected = true
+        } catch (secondError) {
           // If both fail, mark as not connected but don't throw
-          console.log('⚠️ MongoDB connection failed:', authError.message)
+          console.log('⚠️ MongoDB connection failed:', firstError.message)
           console.log('💡 Skipping database tests - MongoDB may not be available')
           mongoConnected = false
         }
