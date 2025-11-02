@@ -6,7 +6,7 @@ FROM node:lts-alpine AS builder
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json package-lock.json ./
 
 # Install all dependencies (including dev dependencies)
 RUN npm ci
@@ -28,7 +28,7 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S eliteuser -u 1001
 
 # Copy package files
-COPY package*.json ./
+COPY package.json package-lock.json ./
 
 # Install only production dependencies
 RUN npm ci --omit=dev && npm cache clean --force
