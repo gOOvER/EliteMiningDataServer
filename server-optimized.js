@@ -30,6 +30,7 @@ const miningRoutes = require('./routes/mining');
 const systemRoutes = require('./routes/systems');
 const marketRoutes = require('./routes/market');
 const statsRoutes = require('./routes/stats');
+const createDashboardRoutes = require('./routes/dashboard');
 
 class EliteMiningDataServer {
   constructor() {
@@ -151,6 +152,10 @@ class EliteMiningDataServer {
   }
 
   setupRoutes() {
+    // Dashboard routes (serve at root for main interface)
+    const dashboardRoutes = createDashboardRoutes(this);
+    this.app.use('/', dashboardRoutes);
+    
     // Health check
     this.app.get('/health', (req, res) => {
       res.json({
@@ -252,6 +257,9 @@ class EliteMiningDataServer {
     this.wss.on('connection', (ws, req) => {
       logger.info(`WebSocket client connected from ${req.socket.remoteAddress}`);
       
+      // Send initial status to new clients
+      this.sendInitialStatus(ws);
+      
       ws.on('message', (message) => {
         try {
           const data = JSON.parse(message);
@@ -281,12 +289,17 @@ class EliteMiningDataServer {
       }));
     });
     
+    // Setup periodic status updates
+    setInterval(() => {
+      this.broadcastStatusUpdate();
+    }, 30000); // Every 30 seconds
+    
     // Broadcast mining opportunities and price alerts
     if (this.optimizer) {
       this.optimizer.on('mining-opportunity', (data) => {
         this.broadcast({
-          type: 'mining-opportunity',
-          data: data,
+          type: 'miningData',
+          payload: data,
           timestamp: new Date().toISOString()
         });
       });
@@ -320,11 +333,69 @@ class EliteMiningDataServer {
         }));
         break;
         
+      case 'get-status':
+        this.sendInitialStatus(ws);
+        break;
+        
       default:
         ws.send(JSON.stringify({
           type: 'error',
           message: 'Unknown message type'
         }));
+    }
+  }
+
+  async sendInitialStatus(ws) {
+    try {
+      // Get dashboard controller if available
+      const dashboardRoutes = this.app._router.stack.find(layer => 
+        layer.route && layer.route.path === '/' && layer.handle.dashboard
+      );
+      
+      if (dashboardRoutes && dashboardRoutes.handle.dashboard) {
+        const dashboard = dashboardRoutes.handle.dashboard;
+        const status = await dashboard.getSystemStatus();
+        const sources = await dashboard.getDataSourceStatus();
+        
+        ws.send(JSON.stringify({
+          type: 'status',
+          payload: status
+        }));
+        
+        ws.send(JSON.stringify({
+          type: 'dataSource',
+          payload: sources
+        }));
+      }
+    } catch (error) {
+      logger.error('Error sending initial status:', error);
+    }
+  }
+
+  async broadcastStatusUpdate() {
+    try {
+      // Find dashboard routes to get status
+      const dashboardLayer = this.app._router.stack.find(layer => 
+        layer.regexp.test('/') && layer.handle.dashboard
+      );
+      
+      if (dashboardLayer && dashboardLayer.handle.dashboard) {
+        const dashboard = dashboardLayer.handle.dashboard;
+        const status = await dashboard.getSystemStatus();
+        const sources = await dashboard.getDataSourceStatus();
+        
+        this.broadcast({
+          type: 'status',
+          payload: status
+        });
+        
+        this.broadcast({
+          type: 'dataSource',
+          payload: sources
+        });
+      }
+    } catch (error) {
+      logger.error('Error broadcasting status update:', error);
     }
   }
 

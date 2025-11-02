@@ -1,4 +1,6 @@
-version: '3.8'
+# Elite Dangerous Mining Data Server - Docker Compose
+# Updated for modern Docker Compose (no version needed)
+# Uses Node.js LTS and MongoDB 8.0
 
 services:
   elite-mining-server:
@@ -28,7 +30,7 @@ services:
 
   # MongoDB for high-volume data storage
   mongodb:
-    image: mongo:7.0
+    image: mongo:8.0
     ports:
       - "27017:27017"
     environment:
@@ -54,8 +56,8 @@ services:
     environment:
       - ME_CONFIG_MONGODB_SERVER=mongodb
       - ME_CONFIG_MONGODB_PORT=27017
-      - ME_CONFIG_BASICAUTH_USERNAME=admin
-      - ME_CONFIG_BASICAUTH_PASSWORD=elite_mining_admin
+      - ME_CONFIG_BASICAUTH_USERNAME=${MONGO_EXPRESS_USERNAME:-admin}
+      - ME_CONFIG_BASICAUTH_PASSWORD=${MONGO_EXPRESS_PASSWORD:-changeme123}
     depends_on:
       - mongodb
     restart: unless-stopped

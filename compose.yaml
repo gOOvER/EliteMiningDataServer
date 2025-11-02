@@ -1,0 +1,126 @@
+# Elite Dangerous Mining Data Server
+# Docker Compose configuration following the official Compose Specification
+# https://docs.docker.com/compose/intro/compose-application-model/
+
+# Preferred filename: compose.yaml (as per official docs)
+# This file supports backwards compatibility as docker-compose.yml
+
+services:
+  # Main application service
+  elite-mining-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3000}
+      MONGODB_URI: mongodb://mongodb:27017/elite_mining
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-elite_mining}
+      MONGODB_MAX_CONNECTIONS: ${MONGODB_MAX_CONNECTIONS:-100}
+      EDDN_RELAY_URL: ${EDDN_RELAY_URL:-tcp://eddn.edcd.io:9500}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CACHE_DURATION_MINUTES: ${CACHE_DURATION_MINUTES:-15}
+      # Optional API keys
+      INARA_API_KEY: ${INARA_API_KEY:-}
+      EDSM_API_KEY: ${EDSM_API_KEY:-}
+      COMMANDER_NAME: ${COMMANDER_NAME:-}
+      COMMANDER_FID: ${COMMANDER_FID:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+    volumes:
+      - mining_logs:/app/logs
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - backend
+      - frontend
+
+  # MongoDB 8.0 database service
+  mongodb:
+    image: mongo:8.0
+    ports:
+      - "${MONGODB_PORT:-27017}:27017"
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGODB_DB_NAME:-elite_mining}
+      # Optional authentication (uncomment for production)
+      # MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-}
+      # MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-}
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    command: >
+      --wiredTigerCacheSizeGB 2
+      --wiredTigerCollectionBlockCompressor zstd
+      --wiredTigerIndexPrefixCompression true
+      --logpath /var/log/mongodb/mongod.log
+      --logappend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - backend
+
+  # MongoDB Express (optional admin interface)
+  mongo-express:
+    image: mongo-express:latest
+    profiles:
+      - admin
+      - development
+    ports:
+      - "${MONGO_EXPRESS_PORT:-8081}:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_PORT: 27017
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-changeme123}
+      # Authentication (if MongoDB auth is enabled)
+      # ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USERNAME:-}
+      # ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD:-}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - backend
+      - frontend
+
+# Named volumes for persistent data
+volumes:
+  mongodb_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/mongodb
+  mongodb_config:
+    driver: local
+  mining_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/logs
+
+# Networks for service isolation
+networks:
+  # Frontend network for external access
+  frontend:
+    driver: bridge
+  # Backend network for internal service communication
+  backend:
+    driver: bridge
+    internal: true

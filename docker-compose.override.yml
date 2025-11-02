@@ -1,0 +1,125 @@
+# Docker Compose override for development with Traefik
+# This file extends compose.yaml for development purposes with reverse proxy
+# Usage: docker compose -f compose.yaml -f docker-compose.override.yml up
+
+services:
+  elite-mining-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development  # If multi-stage build is used
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+    volumes:
+      # Hot reload for development
+      - ./src:/app/src:ro
+      - ./package.json:/app/package.json:ro
+      - ./package-lock.json:/app/package-lock.json:ro
+    command: ["npm", "run", "dev"]
+    labels:
+      # Traefik configuration
+      - "traefik.enable=true"
+      - "traefik.http.routers.elite-mining.rule=Host(`elite-mining.localhost`)"
+      - "traefik.http.routers.elite-mining.entrypoints=web"
+      - "traefik.http.services.elite-mining.loadbalancer.server.port=3000"
+      # Optional: Enable dashboard access
+      - "traefik.http.routers.elite-mining-api.rule=Host(`elite-mining.localhost`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.elite-mining-api.entrypoints=web"
+    networks:
+      - traefik-proxy
+      - backend
+    # Remove port exposure since Traefik handles it
+    ports: []
+    
+  # Enable MongoDB Express for development
+  mongo-express:
+    profiles: ["dev", "development"]
+    environment:
+      - ME_CONFIG_BASICAUTH_USERNAME=${MONGO_EXPRESS_USERNAME:-admin}
+      - ME_CONFIG_BASICAUTH_PASSWORD=${MONGO_EXPRESS_PASSWORD:-changeme}
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=
+    labels:
+      # Traefik configuration for MongoDB Express
+      - "traefik.enable=true"
+      - "traefik.http.routers.mongo-express.rule=Host(`mongo.localhost`)"
+      - "traefik.http.routers.mongo-express.entrypoints=web"
+      - "traefik.http.services.mongo-express.loadbalancer.server.port=8081"
+    networks:
+      - traefik-proxy
+      - backend
+    # Remove port exposure since Traefik handles it
+    ports: []
+
+  # Traefik reverse proxy for development
+  traefik:
+    image: traefik:v3.1
+    command:
+      # Enable Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-proxy"
+      # Configure entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Enable API and dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      # Enable access logs for development
+      - "--accesslog=true"
+      - "--log.level=INFO"
+    ports:
+      - "80:80"      # HTTP
+      - "443:443"    # HTTPS
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_logs_dev:/var/log/traefik
+    labels:
+      # Traefik dashboard configuration
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+    networks:
+      - traefik-proxy
+    restart: unless-stopped
+
+  # CrowdSec for development (optional profile)
+  crowdsec:
+    profiles: ["security", "full"]
+    image: crowdsecurity/crowdsec:latest
+    environment:
+      - PGID=1000
+      - COLLECTIONS=crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/nodejs
+      - GID=1000
+      - CUSTOM_HOSTNAME=elite-mining-crowdsec-dev
+    volumes:
+      - crowdsec_db_dev:/var/lib/crowdsec/data/
+      - crowdsec_config_dev:/etc/crowdsec/
+      - traefik_logs_dev:/var/log/traefik:ro
+      - ./logs:/var/log/elite-mining:ro
+      - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+    networks:
+      - traefik-proxy
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.crowdsec-dev.rule=Host(`crowdsec.localhost`)"
+      - "traefik.http.routers.crowdsec-dev.entrypoints=web"
+      - "traefik.http.services.crowdsec-dev.loadbalancer.server.port=8080"
+
+networks:
+  # Traefik proxy network
+  traefik-proxy:
+    driver: bridge
+    external: false
+
+volumes:
+  traefik_logs_dev:
+    driver: local
+  crowdsec_db_dev:
+    driver: local
+  crowdsec_config_dev:
+    driver: local

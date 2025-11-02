@@ -1,0 +1,37 @@
+# CrowdSec acquisition configuration
+# This file defines which log sources CrowdSec should monitor
+
+filenames:
+  # Traefik access logs
+  - /var/log/traefik/access.log
+  
+labels:
+  type: traefik
+
+---
+
+filenames:
+  # Elite Mining Server application logs
+  - /var/log/elite-mining/*.log
+  
+labels:
+  type: nodejs
+
+---
+
+filenames:
+  # System auth logs (if available)
+  - /var/log/auth.log
+  
+labels:
+  type: syslog
+
+---
+
+# Docker container logs
+source: docker
+container_name:
+  - elite-mining-server
+  - traefik
+labels:
+  type: docker

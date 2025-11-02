@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elite Mining Data Server - Dashboard</title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-rocket"></i> Elite Mining Data Server</h1>
+            <div class="status-indicator" id="connectionStatus">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Connecting...</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <!-- Overview Cards -->
+            <section class="overview-cards">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-heartbeat"></i> System Health</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="metric">
+                            <span class="value" id="uptime">--</span>
+                            <span class="label">Uptime</span>
+                        </div>
+                        <div class="metric">
+                            <span class="value" id="memoryUsage">--</span>
+                            <span class="label">Memory Usage</span>
+                        </div>
+                        <div class="metric">
+                            <span class="value" id="cpuUsage">--</span>
+                            <span class="label">CPU Usage</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-database"></i> Data Sources</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="data-source" id="eddnStatus">
+                            <span class="source-name">EDDN</span>
+                            <span class="source-status">--</span>
+                            <span class="source-count">0 msg/min</span>
+                        </div>
+                        <div class="data-source" id="inaraStatus">
+                            <span class="source-name">Inara</span>
+                            <span class="source-status">--</span>
+                            <span class="source-count">0 req/min</span>
+                        </div>
+                        <div class="data-source" id="edsmStatus">
+                            <span class="source-name">EDSM</span>
+                            <span class="source-status">--</span>
+                            <span class="source-count">0 req/min</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-users"></i> Active Connections</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="metric">
+                            <span class="value" id="websocketConnections">--</span>
+                            <span class="label">WebSocket</span>
+                        </div>
+                        <div class="metric">
+                            <span class="value" id="apiConnections">--</span>
+                            <span class="label">API Clients</span>
+                        </div>
+                        <div class="metric">
+                            <span class="value" id="databaseConnections">--</span>
+                            <span class="label">DB Pool</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-shield-alt"></i> Security</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="metric">
+                            <span class="value" id="blockedIPs">--</span>
+                            <span class="label">Blocked IPs</span>
+                        </div>
+                        <div class="metric">
+                            <span class="value" id="threatLevel">--</span>
+                            <span class="label">Threat Level</span>
+                        </div>
+                        <div class="metric">
+                            <span class="value" id="rateLimits">--</span>
+                            <span class="label">Rate Limits</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Charts Section -->
+            <section class="charts-section">
+                <div class="chart-container">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-chart-line"></i> Data Processing Rate</h3>
+                        </div>
+                        <div class="card-content">
+                            <canvas id="dataRateChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-chart-pie"></i> Data Sources Distribution</h3>
+                        </div>
+                        <div class="card-content">
+                            <canvas id="sourceDistributionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Mining Data Section -->
+            <section class="mining-section">
+                <div class="card full-width">
+                    <div class="card-header">
+                        <h3><i class="fas fa-gem"></i> Recent Mining Data</h3>
+                        <div class="card-actions">
+                            <button class="btn-refresh" id="refreshMiningData">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="table-container">
+                            <table class="data-table" id="miningDataTable">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>System</th>
+                                        <th>Station</th>
+                                        <th>Commodity</th>
+                                        <th>Price</th>
+                                        <th>Supply</th>
+                                        <th>Source</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="miningDataBody">
+                                    <!-- Data will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- System Logs Section -->
+            <section class="logs-section">
+                <div class="card full-width">
+                    <div class="card-header">
+                        <h3><i class="fas fa-terminal"></i> System Logs</h3>
+                        <div class="card-actions">
+                            <select id="logLevel">
+                                <option value="all">All Levels</option>
+                                <option value="error">Errors</option>
+                                <option value="warn">Warnings</option>
+                                <option value="info">Info</option>
+                                <option value="debug">Debug</option>
+                            </select>
+                            <button class="btn-clear" id="clearLogs">
+                                <i class="fas fa-trash"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="log-container" id="logContainer">
+                            <!-- Logs will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>

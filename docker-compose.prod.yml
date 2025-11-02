@@ -1,0 +1,206 @@
+# Production Docker Compose with Traefik
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  elite-mining-server:
+    image: elite-mining-server:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - PORT=3000
+    env_file:
+      - .env.production
+    labels:
+      # Traefik configuration for production
+      - "traefik.enable=true"
+      - "traefik.http.routers.elite-mining.rule=Host(`elite-mining.yourdomain.com`)"
+      - "traefik.http.routers.elite-mining.entrypoints=websecure"
+      - "traefik.http.routers.elite-mining.tls=true"
+      - "traefik.http.routers.elite-mining.tls.certresolver=letsencrypt"
+      - "traefik.http.services.elite-mining.loadbalancer.server.port=3000"
+      # Security middleware
+      - "traefik.http.routers.elite-mining.middlewares=security-headers,rate-limit"
+      # API routes with CORS
+      - "traefik.http.routers.elite-mining-api.rule=Host(`elite-mining.yourdomain.com`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.elite-mining-api.entrypoints=websecure"
+      - "traefik.http.routers.elite-mining-api.tls=true"
+      - "traefik.http.routers.elite-mining-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.elite-mining-api.middlewares=security-headers,cors-headers,rate-limit"
+    networks:
+      - traefik-proxy
+      - backend
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+
+  mongodb:
+    image: mongo:8.0
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGODB_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGODB_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGODB_DATABASE}
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Traefik reverse proxy for production
+  traefik:
+    image: traefik:v3.1
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Dashboard (secure in production)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - traefik_letsencrypt:/letsencrypt
+      - traefik_logs:/var/log/traefik
+    labels:
+      # Dashboard configuration (secured)
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.yourdomain.com`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+      - "traefik.http.routers.traefik.middlewares=admin-auth,security-headers,crowdsec-bouncer"
+    networks:
+      - traefik-proxy
+    restart: unless-stopped
+    command:
+      - "--configfile=/etc/traefik/traefik.yml"
+    depends_on:
+      - crowdsec
+
+  # CrowdSec Security Engine
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    environment:
+      - PGID=1000
+      - COLLECTIONS=crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/whitelist-good-actors crowdsecurity/nodejs
+      - GID=1000
+      - CUSTOM_HOSTNAME=elite-mining-crowdsec
+    volumes:
+      - crowdsec_db:/var/lib/crowdsec/data/
+      - crowdsec_config:/etc/crowdsec/
+      - traefik_logs:/var/log/traefik:ro
+      - ./logs:/var/log/elite-mining:ro
+      - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - ./crowdsec/profiles.yaml:/etc/crowdsec/profiles.yaml:ro
+    networks:
+      - traefik-proxy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      # CrowdSec Dashboard (optional)
+      - "traefik.enable=true"
+      - "traefik.http.routers.crowdsec.rule=Host(`crowdsec.yourdomain.com`)"
+      - "traefik.http.routers.crowdsec.entrypoints=websecure"
+      - "traefik.http.routers.crowdsec.tls=true"
+      - "traefik.http.routers.crowdsec.tls.certresolver=letsencrypt"
+      - "traefik.http.services.crowdsec.loadbalancer.server.port=8080"
+      - "traefik.http.routers.crowdsec.middlewares=admin-auth,security-headers"
+
+  # CrowdSec Bouncer for Traefik
+  crowdsec-bouncer:
+    image: fbonalair/traefik-crowdsec-bouncer:latest
+    environment:
+      - CROWDSEC_BOUNCER_API_KEY=${CROWDSEC_BOUNCER_API_KEY}
+      - CROWDSEC_AGENT_HOST=crowdsec:8080
+      - CROWDSEC_BOUNCER_LOG_LEVEL=INFO
+    networks:
+      - traefik-proxy
+    restart: unless-stopped
+    depends_on:
+      - crowdsec
+
+  # Optional: Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: ["monitoring"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.yourdomain.com`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+      - "traefik.http.routers.prometheus.middlewares=admin-auth,security-headers"
+    networks:
+      - traefik-proxy
+      - backend
+    restart: unless-stopped
+
+  # Optional: Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    profiles: ["monitoring"]
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.yourdomain.com`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      - "traefik.http.routers.grafana.middlewares=security-headers"
+    networks:
+      - traefik-proxy
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  traefik_letsencrypt:
+    driver: local
+  traefik_logs:
+    driver: local
+  crowdsec_db:
+    driver: local
+  crowdsec_config:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  traefik-proxy:
+    driver: bridge
+    external: false
+  backend:
+    driver: bridge
+    internal: true

@@ -1,0 +1,48 @@
+# CrowdSec profiles configuration
+# Defines what actions to take when certain scenarios are detected
+
+name: default_ip_remediation
+debug: false
+filters:
+  - Alert.Remediation == true && Alert.GetScope() == "Ip"
+decisions:
+  - type: ban
+    duration: 4h
+    scope: Ip
+on_success: break
+
+---
+
+name: long_ip_remediation  
+debug: false
+filters:
+  - Alert.Remediation == true && Alert.GetScope() == "Ip" && Alert.GetScenario() contains "bf"
+decisions:
+  - type: ban
+    duration: 24h
+    scope: Ip
+on_success: break
+
+---
+
+name: captcha_remediation
+debug: false
+filters:
+  - Alert.Remediation == true && Alert.GetScope() == "Ip" && Alert.GetScenario() contains "http-crawl-non_statics"
+decisions:
+  - type: captcha
+    duration: 1h
+    scope: Ip
+on_success: break
+
+---
+
+name: slow_remediation
+debug: false  
+filters:
+  - Alert.Remediation == true && Alert.GetScope() == "Ip" && Alert.GetScenario() contains "http-slow"
+decisions:
+  - type: ban
+    duration: 2h
+    scope: Ip
+on_success: break
