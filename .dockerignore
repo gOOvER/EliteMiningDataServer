@@ -86,6 +86,5 @@ scripts
 # Monitoring (development only)
 monitoring-setup.js
 
-# Lock files (already copied via package*.json)
-package-lock.json
+# Yarn lock file (we use npm)
 yarn.lock
