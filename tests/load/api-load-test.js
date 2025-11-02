@@ -1,3 +1,5 @@
+/* eslint-env k6 */
+/* global __ENV */
 import http from 'k6/http'
 import { check, sleep } from 'k6'
 
@@ -155,7 +157,7 @@ function testMiningEndpoints() {
 export function setup() {
   console.log('🚀 Starting Elite Mining Data Server API Load Test...')
   console.log(`📊 Target URL: ${BASE_URL}`)
-  console.log('⏱️  Test Duration: ~4 minutes`)
+  console.log('⏱️  Test Duration: ~4 minutes')
   console.log('👥 Max Concurrent Users: 50')
   
   // Verify the API is accessible before starting the load test
