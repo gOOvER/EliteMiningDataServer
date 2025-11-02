@@ -54,20 +54,6 @@ jobs:
         fi
         npm audit --audit-level=high
 
-    - name: Create test environment
-      run: |
-        cp .env.example .env.test
-        echo "MONGODB_CONNECTION_STRING=mongodb://testuser:testpass123@localhost:27017/elite-mining-test?authSource=admin" >> .env.test
-        echo "NODE_ENV=test" >> .env.test
-        echo "LOG_LEVEL=error" >> .env.test
-
-    - name: Wait for MongoDB
-      run: |
-        until mongosh --host localhost:27017 -u testuser -p testpass123 --authenticationDatabase admin --eval "print('MongoDB is ready')"; do
-          echo "Waiting for MongoDB..."
-          sleep 2
-        done
-
     - name: Create test environment file
       run: |
         echo "NODE_ENV=test" > .env.test
@@ -79,6 +65,13 @@ jobs:
         echo "ENABLE_EDDN=false" >> .env.test
         echo "API_RATE_LIMIT_WINDOW_MS=60000" >> .env.test
         echo "API_RATE_LIMIT_MAX_REQUESTS=1000" >> .env.test
+
+    - name: Wait for MongoDB
+      run: |
+        until mongosh --host localhost:27017 -u testuser -p testpass123 --authenticationDatabase admin --eval "print('MongoDB is ready')"; do
+          echo "Waiting for MongoDB..."
+          sleep 2
+        done
 
     - name: Run unit tests
       env:
