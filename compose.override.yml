@@ -1,0 +1,33 @@
+# Development overrides for Docker Compose
+# This file is automatically loaded when running docker compose up
+# Use this for development-specific configurations
+
+services:
+  mongodb:
+    volumes:
+      # Override with bind mounts for development
+      - ./data/mongodb:/data/db
+      - mongodb_config:/data/configdb
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+
+  elite-mining-server:
+    volumes:
+      # Override with bind mounts for development
+      - ./data/logs:/app/logs
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+
+volumes:
+  mongodb_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/mongodb
+  mining_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/logs

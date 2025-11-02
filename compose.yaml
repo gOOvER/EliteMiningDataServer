@@ -102,18 +102,14 @@ services:
 volumes:
   mongodb_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_PATH:-./data}/mongodb
+    # Use Docker-managed volume for CI/CD compatibility
+    # Bind mounts only in development with DATA_PATH set
   mongodb_config:
     driver: local
   mining_logs:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_PATH:-./data}/logs
+    # Use Docker-managed volume for CI/CD compatibility
+    # Bind mounts only in development with DATA_PATH set
 
 # Networks for service isolation
 networks:

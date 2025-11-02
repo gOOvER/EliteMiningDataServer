@@ -134,6 +134,8 @@ jobs:
     - name: Test Docker Compose
       run: |
         cp .env.example .env
+        # Create required directories for volume mounts in development
+        mkdir -p data/mongodb data/logs
         docker compose -f compose.yaml up -d --wait
         sleep 30
         curl -f http://localhost:3000/health || exit 1
