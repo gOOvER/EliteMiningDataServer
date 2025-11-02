@@ -86,8 +86,12 @@ jobs:
 
     - name: Start application (background)
       run: |
-        # Create test environment file
-        cp .env .env.test
+        # Create test environment file from example
+        if [ -f .env ]; then
+          cp .env .env.test
+        else
+          cp .env.example .env.test
+        fi
         sed -i 's/elite_mining/elite_mining_test/g' .env.test
         sed -i 's/NODE_ENV=development/NODE_ENV=test/g' .env.test
         
