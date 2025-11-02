@@ -1,16 +1,16 @@
-const { MongoClient } = require('mongodb');
-const logger = require('./logger');
+const { MongoClient } = require('mongodb')
+const logger = require('./logger')
 
 class MongoService {
   constructor(config) {
-    this.connectionString = config.uri || 'mongodb://localhost:27017';
-    this.dbName = config.dbName || 'elite_mining';
-    this.maxConnections = config.maxConnections || 100;
+    this.connectionString = config.uri || 'mongodb://localhost:27017'
+    this.dbName = config.dbName || 'elite_mining'
+    this.maxConnections = config.maxConnections || 100
 
-    this.client = null;
-    this.db = null;
-    this.cache = new Map();
-    this.cacheTimeout = config.cacheTimeout || 15 * 60 * 1000; // 15 minutes
+    this.client = null
+    this.db = null
+    this.cache = new Map()
+    this.cacheTimeout = config.cacheTimeout || 15 * 60 * 1000 // 15 minutes
 
     // Performance monitoring
     this.stats = {
@@ -19,12 +19,12 @@ class MongoService {
       documentsProcessed: 0,
       cacheHits: 0,
       cacheMisses: 0,
-    };
+    }
   }
 
   async initialize() {
     try {
-      logger.info('Connecting to MongoDB...');
+      logger.info('Connecting to MongoDB...')
 
       this.client = new MongoClient(this.connectionString, {
         maxPoolSize: this.maxConnections,
@@ -35,23 +35,23 @@ class MongoService {
         // Compression disabled to avoid optional dependency issues
         // Can be re-enabled by installing @mongodb-js/zstd and @mongodb-js/zlib
         // compressors: ['zstd', 'zlib']
-      });
+      })
 
-      await this.client.connect();
-      this.db = this.client.db(this.dbName);
+      await this.client.connect()
+      this.db = this.client.db(this.dbName)
 
       // Test connection
-      await this.db.admin().ping();
-      logger.info(`Connected to MongoDB database: ${this.dbName}`);
+      await this.db.admin().ping()
+      logger.info(`Connected to MongoDB database: ${this.dbName}`)
 
       // Create collections and indexes
-      await this.setupCollections();
+      await this.setupCollections()
 
       // Setup periodic cache cleanup
-      setInterval(() => this.clearExpiredCache(), 5 * 60 * 1000); // Every 5 minutes
+      setInterval(() => this.clearExpiredCache(), 5 * 60 * 1000) // Every 5 minutes
     } catch (error) {
-      logger.error('MongoDB connection error:', error);
-      throw error;
+      logger.error('MongoDB connection error:', error)
+      throw error
     }
   }
 
@@ -65,11 +65,11 @@ class MongoService {
         'stations',
         'mining_reports',
         'mining_analytics', // For aggregated data
-      ];
+      ]
 
       for (const collectionName of collections) {
         try {
-          await this.db.createCollection(collectionName);
+          await this.db.createCollection(collectionName)
         } catch (error) {
           // Collection might already exist, that's fine
           if (error.code !== 48) {
@@ -77,16 +77,16 @@ class MongoService {
             logger.warn(
               `Could not create collection ${collectionName}:`,
               error.message
-            );
+            )
           }
         }
       }
 
-      await this.createIndexes();
-      logger.info('MongoDB collections and indexes created successfully');
+      await this.createIndexes()
+      logger.info('MongoDB collections and indexes created successfully')
     } catch (error) {
-      logger.error('Error setting up collections:', error);
-      throw error;
+      logger.error('Error setting up collections:', error)
+      throw error
     }
   }
 
@@ -111,7 +111,7 @@ class MongoService {
           key: { lastUpdated: -1 },
           name: 'lastUpdated_-1',
         },
-      ]);
+      ])
 
       // Mining sites - Spatial and material queries
       await this.db.collection('mining_sites').createIndexes([
@@ -136,7 +136,7 @@ class MongoService {
           key: { lastUpdated: -1 },
           name: 'site_lastUpdated_-1',
         },
-      ]);
+      ])
 
       // Commodity prices - High-frequency updates
       await this.db.collection('commodity_prices').createIndexes([
@@ -162,7 +162,7 @@ class MongoService {
           name: 'price_lastUpdated_-1',
           expireAfterSeconds: 86400 * 7, // Auto-delete after 7 days
         },
-      ]);
+      ])
 
       // Mining reports - Time series data
       await this.db.collection('mining_reports').createIndexes([
@@ -179,7 +179,7 @@ class MongoService {
           name: 'timestamp_ttl',
           expireAfterSeconds: 86400 * 30, // Auto-delete after 30 days
         },
-      ]);
+      ])
 
       // Stations
       await this.db.collection('stations').createIndexes([
@@ -192,12 +192,12 @@ class MongoService {
           key: { systemName: 1, distanceFromStar: 1 },
           name: 'system_distance',
         },
-      ]);
+      ])
 
-      logger.info('MongoDB indexes created successfully');
+      logger.info('MongoDB indexes created successfully')
     } catch (error) {
-      logger.error('Error creating indexes:', error);
-      throw error;
+      logger.error('Error creating indexes:', error)
+      throw error
     }
   }
 
@@ -205,7 +205,7 @@ class MongoService {
   async bulkInsertCommodityPrices(pricesData) {
     try {
       if (!Array.isArray(pricesData) || pricesData.length === 0) {
-        return { insertedCount: 0 };
+        return { insertedCount: 0 }
       }
 
       const operations = pricesData.map((price) => ({
@@ -221,24 +221,24 @@ class MongoService {
           },
           upsert: true,
         },
-      }));
+      }))
 
       const result = await this.db
         .collection('commodity_prices')
         .bulkWrite(operations, {
           ordered: false, // Continue on errors
           bypassDocumentValidation: false,
-        });
+        })
 
-      this.stats.documentsProcessed += pricesData.length;
+      this.stats.documentsProcessed += pricesData.length
       logger.info(
         `Bulk inserted ${result.upsertedCount + result.modifiedCount} commodity prices`
-      );
+      )
 
-      return result;
+      return result
     } catch (error) {
-      logger.error('Error in bulk insert commodity prices:', error);
-      throw error;
+      logger.error('Error in bulk insert commodity prices:', error)
+      throw error
     }
   }
 
@@ -253,17 +253,17 @@ class MongoService {
         timestamp: new Date(),
         source: data.source,
         coordinates: data.coordinates || null,
-      };
+      }
 
       const result = await this.db
         .collection('mining_reports')
-        .insertOne(document);
-      this.stats.documentsProcessed++;
+        .insertOne(document)
+      this.stats.documentsProcessed++
 
-      return result;
+      return result
     } catch (error) {
-      logger.error('Error inserting mining report:', error);
-      throw error;
+      logger.error('Error inserting mining report:', error)
+      throw error
     }
   }
 
@@ -291,7 +291,7 @@ class MongoService {
         },
         lastUpdated: new Date(),
         source: data.source,
-      };
+      }
 
       const result = await this.db.collection('mining_sites').replaceOne(
         {
@@ -301,30 +301,30 @@ class MongoService {
         },
         document,
         { upsert: true }
-      );
+      )
 
-      this.stats.documentsProcessed++;
-      return result;
+      this.stats.documentsProcessed++
+      return result
     } catch (error) {
-      logger.error('Error inserting mining site:', error);
-      throw error;
+      logger.error('Error inserting mining site:', error)
+      throw error
     }
   }
 
   // Advanced aggregation for mining opportunities
   async findBestMiningOpportunities(systemName, radius = 50, material = null) {
-    const cacheKey = `mining_opportunities_${systemName}_${radius}_${material || 'all'}`;
-    const cached = this.getCache(cacheKey);
-    if (cached) return cached;
+    const cacheKey = `mining_opportunities_${systemName}_${radius}_${material || 'all'}`
+    const cached = this.getCache(cacheKey)
+    if (cached) return cached
 
     try {
       // Get reference system coordinates
       const referenceSystem = await this.db
         .collection('systems')
-        .findOne({ name: systemName }, { projection: { coordinates: 1 } });
+        .findOne({ name: systemName }, { projection: { coordinates: 1 } })
 
       if (!referenceSystem?.coordinates) {
-        return [];
+        return []
       }
 
       const pipeline = [
@@ -337,7 +337,7 @@ class MongoService {
             distanceMultiplier: 1 / (3.26156 * 9461000000000), // back to ly
           },
         },
-      ];
+      ]
 
       // Filter by material if specified
       if (material) {
@@ -345,7 +345,7 @@ class MongoService {
           $match: {
             hotspotMaterials: material,
           },
-        });
+        })
       }
 
       // Add commodity price data
@@ -385,56 +385,56 @@ class MongoService {
         },
         { $sort: { profitabilityScore: -1, distanceFromReference: 1 } },
         { $limit: 20 }
-      );
+      )
 
       const opportunities = await this.db
         .collection('mining_sites')
         .aggregate(pipeline)
-        .toArray();
+        .toArray()
 
-      this.setCache(cacheKey, opportunities, 10 * 60 * 1000); // 10 minutes cache
-      this.stats.queriesExecuted++;
+      this.setCache(cacheKey, opportunities, 10 * 60 * 1000) // 10 minutes cache
+      this.stats.queriesExecuted++
 
-      return opportunities;
+      return opportunities
     } catch (error) {
-      logger.error('Error finding mining opportunities:', error);
-      return [];
+      logger.error('Error finding mining opportunities:', error)
+      return []
     }
   }
 
   // Optimized commodity price queries
   async getBestCommodityPrices(commodityName, limit = 10, priceType = 'sell') {
-    const cacheKey = `best_${priceType}_${commodityName}_${limit}`;
-    const cached = this.getCache(cacheKey);
+    const cacheKey = `best_${priceType}_${commodityName}_${limit}`
+    const cached = this.getCache(cacheKey)
     if (cached) {
-      this.stats.cacheHits++;
-      return cached;
+      this.stats.cacheHits++
+      return cached
     }
 
     try {
-      const sortField = priceType === 'sell' ? 'prices.sell' : 'prices.buy';
-      const sortOrder = priceType === 'sell' ? -1 : 1;
+      const sortField = priceType === 'sell' ? 'prices.sell' : 'prices.buy'
+      const sortOrder = priceType === 'sell' ? -1 : 1
 
       const query = {
         commodityName,
         [sortField]: { $gt: 0 },
-      };
+      }
 
       const results = await this.db
         .collection('commodity_prices')
         .find(query)
         .sort({ [sortField]: sortOrder })
         .limit(limit)
-        .toArray();
+        .toArray()
 
-      this.setCache(cacheKey, results, 5 * 60 * 1000); // 5 minutes cache
-      this.stats.cacheMisses++;
-      this.stats.queriesExecuted++;
+      this.setCache(cacheKey, results, 5 * 60 * 1000) // 5 minutes cache
+      this.stats.cacheMisses++
+      this.stats.queriesExecuted++
 
-      return results;
+      return results
     } catch (error) {
-      logger.error('Error getting commodity prices:', error);
-      return [];
+      logger.error('Error getting commodity prices:', error)
+      return []
     }
   }
 
@@ -475,12 +475,12 @@ class MongoService {
           },
         },
         { $sort: { _id: -1 } },
-      ];
+      ]
 
       const stats = await this.db
         .collection('mining_reports')
         .aggregate(pipeline)
-        .toArray();
+        .toArray()
 
       // Store aggregated data for faster access
       if (stats.length > 0) {
@@ -493,48 +493,48 @@ class MongoService {
             generatedAt: new Date(),
           },
           { upsert: true }
-        );
+        )
       }
 
-      return stats;
+      return stats
     } catch (error) {
-      logger.error('Error generating mining stats:', error);
-      return [];
+      logger.error('Error generating mining stats:', error)
+      return []
     }
   }
 
   // Cache management
   setCache(key, value, customTimeout = null) {
-    const timeout = customTimeout || this.cacheTimeout;
-    const expiry = Date.now() + timeout;
-    this.cache.set(key, { value, expiry });
+    const timeout = customTimeout || this.cacheTimeout
+    const expiry = Date.now() + timeout
+    this.cache.set(key, { value, expiry })
   }
 
   getCache(key) {
-    const cached = this.cache.get(key);
-    if (!cached) return null;
+    const cached = this.cache.get(key)
+    if (!cached) return null
 
     if (Date.now() > cached.expiry) {
-      this.cache.delete(key);
-      return null;
+      this.cache.delete(key)
+      return null
     }
 
-    return cached.value;
+    return cached.value
   }
 
   clearExpiredCache() {
-    const now = Date.now();
-    let cleared = 0;
+    const now = Date.now()
+    let cleared = 0
 
     for (const [key, value] of this.cache.entries()) {
       if (now > value.expiry) {
-        this.cache.delete(key);
-        cleared++;
+        this.cache.delete(key)
+        cleared++
       }
     }
 
     if (cleared > 0) {
-      logger.debug(`Cleared ${cleared} expired cache entries`);
+      logger.debug(`Cleared ${cleared} expired cache entries`)
     }
   }
 
@@ -544,19 +544,19 @@ class MongoService {
       ...this.stats,
       cacheSize: this.cache.size,
       connected: this.client?.topology?.isConnected() || false,
-    };
+    }
   }
 
   async close() {
     try {
       if (this.client) {
-        await this.client.close();
-        logger.info('MongoDB connection closed');
+        await this.client.close()
+        logger.info('MongoDB connection closed')
       }
     } catch (error) {
-      logger.error('Error closing MongoDB connection:', error);
+      logger.error('Error closing MongoDB connection:', error)
     }
   }
 }
 
-module.exports = MongoService;
+module.exports = MongoService

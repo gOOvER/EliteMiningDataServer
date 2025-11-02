@@ -1,7 +1,7 @@
-require('dotenv').config();
+require('dotenv').config()
 
-const Server = require('./server');
-const logger = require('./services/logger');
+const Server = require('./server')
+const logger = require('./services/logger')
 
 // Configuration
 const config = {
@@ -36,80 +36,80 @@ const config = {
   allowedOrigins: process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',')
     : ['http://localhost:3000', 'http://localhost:3001'],
-};
+}
 
 // Create and start server
 async function startServer() {
   try {
-    logger.info('Starting Elite Mining Data Server...');
-    logger.info(`Node.js version: ${process.version}`);
-    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info('Starting Elite Mining Data Server...')
+    logger.info(`Node.js version: ${process.version}`)
+    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`)
 
-    const server = new Server(config);
+    const server = new Server(config)
 
     // Initialize server components
-    await server.initialize();
+    await server.initialize()
 
     // Start HTTP server
-    await server.start();
+    await server.start()
 
-    logger.info('Elite Mining Data Server started successfully');
-    logger.info('Available endpoints:');
-    logger.info(`  Health Check: http://localhost:${config.port}/health`);
-    logger.info(`  API Status: http://localhost:${config.port}/api/status`);
+    logger.info('Elite Mining Data Server started successfully')
+    logger.info('Available endpoints:')
+    logger.info(`  Health Check: http://localhost:${config.port}/health`)
+    logger.info(`  API Status: http://localhost:${config.port}/api/status`)
     logger.info(
       `  API Documentation: http://localhost:${config.port}/api/status/endpoints`
-    );
-    logger.info(`  WebSocket: ws://localhost:${config.port}`);
+    )
+    logger.info(`  WebSocket: ws://localhost:${config.port}`)
 
     // Log configuration (without sensitive data)
-    logger.info('Configuration:');
-    logger.info(`  Port: ${config.port}`);
-    logger.info(`  Database: ${config.database.dbPath}`);
-    logger.info(`  EDDN Relay: ${config.eddn.relayUrl}`);
+    logger.info('Configuration:')
+    logger.info(`  Port: ${config.port}`)
+    logger.info(`  Database: ${config.database.dbPath}`)
+    logger.info(`  EDDN Relay: ${config.eddn.relayUrl}`)
     logger.info(
       `  Inara API: ${config.inara.apiKey ? 'Configured' : 'Not configured'}`
-    );
+    )
     logger.info(
       `  EDSM API: ${config.edsm.apiKey ? 'Configured' : 'Not configured'}`
-    );
+    )
 
     // Graceful shutdown handling
     const shutdownHandler = async (signal) => {
-      logger.info(`Received ${signal}, shutting down gracefully...`);
+      logger.info(`Received ${signal}, shutting down gracefully...`)
 
       try {
-        await server.stop();
-        logger.info('Server stopped successfully');
-        process.exit(0);
+        await server.stop()
+        logger.info('Server stopped successfully')
+        process.exit(0)
       } catch (error) {
-        logger.error('Error during shutdown:', error);
-        process.exit(1);
+        logger.error('Error during shutdown:', error)
+        process.exit(1)
       }
-    };
+    }
 
-    process.on('SIGTERM', () => shutdownHandler('SIGTERM'));
-    process.on('SIGINT', () => shutdownHandler('SIGINT'));
+    process.on('SIGTERM', () => shutdownHandler('SIGTERM'))
+    process.on('SIGINT', () => shutdownHandler('SIGINT'))
 
     // Handle uncaught exceptions
     process.on('uncaughtException', (error) => {
-      logger.error('Uncaught Exception:', error);
-      process.exit(1);
-    });
+      logger.error('Uncaught Exception:', error)
+      process.exit(1)
+    })
 
     process.on('unhandledRejection', (reason, promise) => {
-      logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-      process.exit(1);
-    });
+      logger.error('Unhandled Rejection at:', promise, 'reason:', reason)
+      process.exit(1)
+    })
   } catch (error) {
-    logger.error('Failed to start server:', error);
-    process.exit(1);
+    logger.error('Failed to start server:', error)
+    process.exit(1)
   }
 }
 
 // Start the server
 if (require.main === module) {
-  startServer();
+  startServer()
 }
 
-module.exports = { startServer, config };
+module.exports = { startServer, config }

@@ -1,21 +1,21 @@
-const axios = require('axios');
-const logger = require('../services/logger');
+const axios = require('axios')
+const logger = require('../services/logger')
 
 class InaraClient {
   constructor(config) {
-    this.apiUrl = 'https://inara.cz/inapi/v1/';
-    this.appName = config.appName || 'EliteMiningDataServer';
-    this.appVersion = config.appVersion || '1.0.0';
-    this.apiKey = config.apiKey; // Optional, for higher rate limits
-    this.isDeveloper = config.isDeveloper || false;
-    this.commanderName = config.commanderName || null;
-    this.commanderFID = config.commanderFID || null;
+    this.apiUrl = 'https://inara.cz/inapi/v1/'
+    this.appName = config.appName || 'EliteMiningDataServer'
+    this.appVersion = config.appVersion || '1.0.0'
+    this.apiKey = config.apiKey // Optional, for higher rate limits
+    this.isDeveloper = config.isDeveloper || false
+    this.commanderName = config.commanderName || null
+    this.commanderFID = config.commanderFID || null
 
     // Rate limiting (per Inara API docs)
-    this.rateLimitDelay = 1000; // 1 second between requests
-    this.lastRequestTime = 0;
-    this.requestQueue = [];
-    this.isProcessingQueue = false;
+    this.rateLimitDelay = 1000 // 1 second between requests
+    this.lastRequestTime = 0
+    this.requestQueue = []
+    this.isProcessingQueue = false
   }
 
   async makeRequest(events) {
@@ -28,7 +28,7 @@ class InaraClient {
         commanderName: null,
       },
       events,
-    };
+    }
 
     try {
       const response = await axios.post(this.apiUrl, requestData, {
@@ -36,16 +36,16 @@ class InaraClient {
           'Content-Type': 'application/json',
         },
         timeout: 30000,
-      });
+      })
 
       if (response.data && response.data.events) {
-        return response.data.events;
+        return response.data.events
       } else {
-        throw new Error('Invalid response format from Inara API');
+        throw new Error('Invalid response format from Inara API')
       }
     } catch (error) {
-      logger.error('Inara API request failed:', error.message);
-      throw error;
+      logger.error('Inara API request failed:', error.message)
+      throw error
     }
   }
 
@@ -58,17 +58,17 @@ class InaraClient {
           systemName,
         },
       },
-    ];
+    ]
 
     try {
-      const results = await this.makeRequest(events);
-      return results[0]?.eventData || [];
+      const results = await this.makeRequest(events)
+      return results[0]?.eventData || []
     } catch (error) {
       logger.error(
         `Failed to get stations for system ${systemName}:`,
         error.message
-      );
-      return [];
+      )
+      return []
     }
   }
 
@@ -81,17 +81,17 @@ class InaraClient {
           stationId,
         },
       },
-    ];
+    ]
 
     try {
-      const results = await this.makeRequest(events);
-      return results[0]?.eventData || {};
+      const results = await this.makeRequest(events)
+      return results[0]?.eventData || {}
     } catch (error) {
       logger.error(
         `Failed to get market data for station ${stationId}:`,
         error.message
-      );
-      return {};
+      )
+      return {}
     }
   }
 
@@ -104,17 +104,17 @@ class InaraClient {
           commodityId,
         },
       },
-    ];
+    ]
 
     try {
-      const results = await this.makeRequest(events);
-      return results[0]?.eventData || [];
+      const results = await this.makeRequest(events)
+      return results[0]?.eventData || []
     } catch (error) {
       logger.error(
         `Failed to get commodity prices for ${commodityId}:`,
         error.message
-      );
-      return [];
+      )
+      return []
     }
   }
 
@@ -137,35 +137,35 @@ class InaraClient {
       { id: 49, name: 'Gold' },
       { id: 56, name: 'Silver' },
       { id: 53, name: 'Palladium' },
-    ];
+    ]
 
-    const allPrices = {};
+    const allPrices = {}
 
     for (const commodity of miningCommodities) {
       try {
         await new Promise((resolve) =>
           setTimeout(resolve, this.rateLimitDelay)
-        );
+        )
 
-        const prices = await this.getCommodityPrices(commodity.id);
+        const prices = await this.getCommodityPrices(commodity.id)
         allPrices[commodity.name] = {
           id: commodity.id,
           prices: prices.slice(0, 10), // Top 10 best prices
-        };
+        }
 
         logger.info(
           `Retrieved prices for ${commodity.name}: ${prices.length} stations`
-        );
+        )
       } catch (error) {
         logger.error(
           `Failed to get prices for ${commodity.name}:`,
           error.message
-        );
-        allPrices[commodity.name] = { id: commodity.id, prices: [] };
+        )
+        allPrices[commodity.name] = { id: commodity.id, prices: [] }
       }
     }
 
-    return allPrices;
+    return allPrices
   }
 
   async getNearbyStations(systemName, maxDistance = 50) {
@@ -178,17 +178,17 @@ class InaraClient {
           maxDistance,
         },
       },
-    ];
+    ]
 
     try {
-      const results = await this.makeRequest(events);
-      return results[0]?.eventData || [];
+      const results = await this.makeRequest(events)
+      return results[0]?.eventData || []
     } catch (error) {
       logger.error(
         `Failed to get nearby stations for ${systemName}:`,
         error.message
-      );
-      return [];
+      )
+      return []
     }
   }
 
@@ -201,19 +201,19 @@ class InaraClient {
           searchName: searchTerm,
         },
       },
-    ];
+    ]
 
     try {
-      const results = await this.makeRequest(events);
-      return results[0]?.eventData || [];
+      const results = await this.makeRequest(events)
+      return results[0]?.eventData || []
     } catch (error) {
       logger.error(
         `Failed to search commodities for "${searchTerm}":`,
         error.message
-      );
-      return [];
+      )
+      return []
     }
   }
 }
 
-module.exports = InaraClient;
+module.exports = InaraClient

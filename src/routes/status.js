@@ -1,11 +1,11 @@
-const express = require('express');
-const router = express.Router();
-const logger = require('../services/logger');
+const express = require('express')
+const router = express.Router()
+const logger = require('../services/logger')
 
 // Get server status and statistics
 router.get('/', async (req, res) => {
   try {
-    const database = req.app.locals.database;
+    const database = req.app.locals.database
 
     // Get database statistics
     const [
@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
       ),
       database.getQuery('SELECT COUNT(*) as count FROM mining_reports'),
       database.getQuery('SELECT COUNT(*) as count FROM mining_sites'),
-    ]);
+    ])
 
     // Get recent activity
     const recentActivity = await database.allQuery(`
@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
       FROM mining_reports 
       ORDER BY timestamp DESC 
       LIMIT 5
-    `);
+    `)
 
     // Get data freshness
     const dataFreshness = await database.allQuery(`
@@ -51,7 +51,7 @@ router.get('/', async (req, res) => {
         MIN(timestamp) as oldest_update
       FROM mining_reports
       WHERE timestamp > datetime('now', '-24 hours')
-    `);
+    `)
 
     const status = {
       server: {
@@ -97,11 +97,11 @@ router.get('/', async (req, res) => {
         total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
         external: Math.round(process.memoryUsage().external / 1024 / 1024),
       },
-    };
+    }
 
-    res.json(status);
+    res.json(status)
   } catch (error) {
-    logger.error('Error fetching server status:', error);
+    logger.error('Error fetching server status:', error)
     res.status(500).json({
       server: {
         status: 'error',
@@ -109,9 +109,9 @@ router.get('/', async (req, res) => {
         timestamp: new Date().toISOString(),
       },
       error: 'Failed to fetch complete status',
-    });
+    })
   }
-});
+})
 
 // Get EDDN statistics
 router.get('/eddn', async (req, res) => {
@@ -126,12 +126,12 @@ router.get('/eddn', async (req, res) => {
       uptime: 0,
       messagesPerSecond: 0,
       lastMessage: null,
-    });
+    })
   } catch (error) {
-    logger.error('Error fetching EDDN status:', error);
-    res.status(500).json({ error: 'Failed to fetch EDDN status' });
+    logger.error('Error fetching EDDN status:', error)
+    res.status(500).json({ error: 'Failed to fetch EDDN status' })
   }
-});
+})
 
 // Get API endpoints documentation
 router.get('/endpoints', (req, res) => {
@@ -199,10 +199,10 @@ router.get('/endpoints', (req, res) => {
         ping: { type: 'ping' },
       },
     },
-  };
+  }
 
-  res.json(endpoints);
-});
+  res.json(endpoints)
+})
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -211,7 +211,7 @@ router.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     pid: process.pid,
-  });
-});
+  })
+})
 
-module.exports = router;
+module.exports = router

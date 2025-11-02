@@ -14,7 +14,13 @@ module.exports = {
   rules: {
     // 'linebreak-style': ['error', process.platform === 'win32' ? 'windows' : 'unix'],
     'no-console': 'warn',
-    'no-unused-vars': ['error', { argsIgnorePattern: '^_' }]
+    'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    // Entspannung für bessere Prettier-Kompatibilität
+    'semi': ['error', 'never'],
+    'comma-dangle': 'off',
+    'space-before-function-paren': 'off',
+    'indent': 'off',
+    'quotes': 'off'
   },
   overrides: [
     {

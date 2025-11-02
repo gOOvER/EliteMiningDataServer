@@ -3,25 +3,25 @@
  * Express middleware for automatic error tracking, performance monitoring, and request logging
  */
 
-const ErrorTrackingService = require('../services/errorTrackingService');
-const PerformanceMetricsService = require('../services/performanceMetricsService');
+const ErrorTrackingService = require('../services/errorTrackingService')
+const PerformanceMetricsService = require('../services/performanceMetricsService')
 
 class MonitoringMiddleware {
   constructor() {
-    this.errorTracking = new ErrorTrackingService();
-    this.performanceMetrics = new PerformanceMetricsService();
-    this.initialized = false;
+    this.errorTracking = new ErrorTrackingService()
+    this.performanceMetrics = new PerformanceMetricsService()
+    this.initialized = false
   }
 
   /**
    * Initialize monitoring middleware
    */
   async initialize() {
-    if (this.initialized) return;
+    if (this.initialized) return
 
-    await this.errorTracking.initialize();
-    this.performanceMetrics.startCollection();
-    this.initialized = true;
+    await this.errorTracking.initialize()
+    this.performanceMetrics.startCollection()
+    this.initialized = true
   }
 
   /**
@@ -29,15 +29,15 @@ class MonitoringMiddleware {
    */
   requestTiming() {
     return (req, res, next) => {
-      req.startTime = Date.now();
+      req.startTime = Date.now()
 
       // Add request ID for tracking
-      req.requestId = this.generateRequestId();
+      req.requestId = this.generateRequestId()
 
       // Track request start
       res.on('finish', () => {
-        const responseTime = Date.now() - req.startTime;
-        const size = parseInt(res.get('Content-Length') || '0');
+        const responseTime = Date.now() - req.startTime
+        const size = parseInt(res.get('Content-Length') || '0')
 
         this.performanceMetrics.recordRequest(
           req.route?.path || req.path,
@@ -45,11 +45,11 @@ class MonitoringMiddleware {
           res.statusCode,
           responseTime,
           size
-        );
-      });
+        )
+      })
 
-      next();
-    };
+      next()
+    }
   }
 
   /**
@@ -72,14 +72,14 @@ class MonitoringMiddleware {
           headers: this.sanitizeHeaders(req.headers),
           body: this.sanitizeBody(req.body),
         },
-      });
+      })
 
       // Add error ID to response headers
-      res.set('X-Error-ID', errorId);
+      res.set('X-Error-ID', errorId)
 
       // Continue with default error handling
-      next(error);
-    };
+      next(error)
+    }
   }
 
   /**
@@ -87,27 +87,27 @@ class MonitoringMiddleware {
    */
   requestLogging() {
     return (req, res, next) => {
-      const startTime = Date.now();
+      const startTime = Date.now()
 
       // Log request start
       // eslint-disable-next-line no-console
       console.log(
         `${new Date().toISOString()} [${req.requestId}] ${req.method} ${req.path} - ${req.ip}`
-      );
+      )
 
       res.on('finish', () => {
-        const responseTime = Date.now() - startTime;
-        const logLevel = res.statusCode >= 400 ? 'ERROR' : 'INFO';
+        const responseTime = Date.now() - startTime
+        const logLevel = res.statusCode >= 400 ? 'ERROR' : 'INFO'
 
         // eslint-disable-next-line no-console
         console.log(
           `${new Date().toISOString()} [${req.requestId}] ${logLevel}: ` +
             `${req.method} ${req.path} - ${res.statusCode} - ${responseTime}ms - ${req.ip}`
-        );
-      });
+        )
+      })
 
-      next();
-    };
+      next()
+    }
   }
 
   /**
@@ -125,11 +125,11 @@ class MonitoringMiddleware {
           ipAddress: req.ip,
           userAgent: req.get('User-Agent'),
           requestId: req.requestId,
-        });
+        })
       }
 
-      next();
-    };
+      next()
+    }
   }
 
   /**
@@ -145,23 +145,23 @@ class MonitoringMiddleware {
         /(exec.*xp_)/i,
         /(\.\.)/,
         /(\/etc\/passwd)/i,
-      ];
+      ]
 
       const checkValue = (value) => {
         if (typeof value === 'string') {
-          return suspiciousPatterns.some((pattern) => pattern.test(value));
+          return suspiciousPatterns.some((pattern) => pattern.test(value))
         }
-        return false;
-      };
+        return false
+      }
 
-      let suspicious = false;
-      const suspiciousData = [];
+      let suspicious = false
+      const suspiciousData = []
 
       // Check query parameters
       for (const [key, value] of Object.entries(req.query || {})) {
         if (checkValue(value)) {
-          suspicious = true;
-          suspiciousData.push({ type: 'query', key, value });
+          suspicious = true
+          suspiciousData.push({ type: 'query', key, value })
         }
       }
 
@@ -169,21 +169,21 @@ class MonitoringMiddleware {
       if (req.body && typeof req.body === 'object') {
         for (const [key, value] of Object.entries(req.body)) {
           if (checkValue(value)) {
-            suspicious = true;
-            suspiciousData.push({ type: 'body', key, value });
+            suspicious = true
+            suspiciousData.push({ type: 'body', key, value })
           }
         }
       }
 
       // Check headers for suspicious values
-      const suspiciousHeaders = req.get('User-Agent');
+      const suspiciousHeaders = req.get('User-Agent')
       if (suspiciousHeaders && checkValue(suspiciousHeaders)) {
-        suspicious = true;
+        suspicious = true
         suspiciousData.push({
           type: 'header',
           key: 'User-Agent',
           value: suspiciousHeaders,
-        });
+        })
       }
 
       if (suspicious) {
@@ -202,11 +202,11 @@ class MonitoringMiddleware {
               fullUrl: req.originalUrl,
             },
           }
-        );
+        )
       }
 
-      next();
-    };
+      next()
+    }
   }
 
   /**
@@ -215,11 +215,11 @@ class MonitoringMiddleware {
   apiUsageMonitoring() {
     return (req, res, next) => {
       // Track API key usage if present
-      const apiKey = req.get('X-API-Key') || req.query.api_key;
+      const apiKey = req.get('X-API-Key') || req.query.api_key
       if (apiKey) {
         // Would track API key usage here
         // eslint-disable-next-line no-console
-        console.log(`API Key used: ${apiKey.substring(0, 8)}...`);
+        console.log(`API Key used: ${apiKey.substring(0, 8)}...`)
       }
 
       // Track endpoint usage patterns
@@ -232,43 +232,43 @@ class MonitoringMiddleware {
           apiKey: apiKey ? apiKey.substring(0, 8) + '...' : null,
           userAgent: req.get('User-Agent'),
           ipAddress: req.ip,
-        };
+        }
 
         // Store usage data (would typically go to database)
         // eslint-disable-next-line no-console
-        console.log('API Usage:', JSON.stringify(usageData));
-      });
+        console.log('API Usage:', JSON.stringify(usageData))
+      })
 
-      next();
-    };
+      next()
+    }
   }
 
   /**
    * Categorize request errors
    */
   categorizeRequestError(error, _req) {
-    const message = error.message.toLowerCase();
+    const message = error.message.toLowerCase()
 
-    if (message.includes('validation')) return 'VALIDATION_ERROR';
+    if (message.includes('validation')) return 'VALIDATION_ERROR'
     if (
       message.includes('authentication') ||
       message.includes('unauthorized')
     ) {
-      return 'AUTHENTICATION_ERROR';
+      return 'AUTHENTICATION_ERROR'
     }
     if (message.includes('permission') || message.includes('forbidden')) {
-      return 'PERMISSION_ERROR';
+      return 'PERMISSION_ERROR'
     }
     if (message.includes('not found') || message.includes('404')) {
-      return 'NOT_FOUND_ERROR';
+      return 'NOT_FOUND_ERROR'
     }
-    if (message.includes('timeout')) return 'TIMEOUT_ERROR';
+    if (message.includes('timeout')) return 'TIMEOUT_ERROR'
     if (message.includes('database') || message.includes('connection')) {
-      return 'DATABASE_ERROR';
+      return 'DATABASE_ERROR'
     }
-    if (message.includes('rate limit')) return 'RATE_LIMIT_ERROR';
+    if (message.includes('rate limit')) return 'RATE_LIMIT_ERROR'
 
-    return 'API_ERROR';
+    return 'API_ERROR'
   }
 
   /**
@@ -280,20 +280,20 @@ class MonitoringMiddleware {
       // Error object is available for additional analysis if needed
     }
 
-    if (statusCode >= 500) return 'high';
-    if (statusCode === 401 || statusCode === 403) return 'medium';
-    if (statusCode === 404) return 'low';
-    if (statusCode === 429) return 'low';
-    if (statusCode >= 400) return 'medium';
+    if (statusCode >= 500) return 'high'
+    if (statusCode === 401 || statusCode === 403) return 'medium'
+    if (statusCode === 404) return 'low'
+    if (statusCode === 429) return 'low'
+    if (statusCode >= 400) return 'medium'
 
-    return 'low';
+    return 'low'
   }
 
   /**
    * Sanitize headers for logging
    */
   sanitizeHeaders(headers) {
-    const sanitized = { ...headers };
+    const sanitized = { ...headers }
 
     // Remove sensitive headers
     const sensitiveHeaders = [
@@ -301,24 +301,24 @@ class MonitoringMiddleware {
       'cookie',
       'x-api-key',
       'x-auth-token',
-    ];
+    ]
 
     sensitiveHeaders.forEach((header) => {
       if (sanitized[header]) {
-        sanitized[header] = '[REDACTED]';
+        sanitized[header] = '[REDACTED]'
       }
-    });
+    })
 
-    return sanitized;
+    return sanitized
   }
 
   /**
    * Sanitize request body for logging
    */
   sanitizeBody(body) {
-    if (!body || typeof body !== 'object') return body;
+    if (!body || typeof body !== 'object') return body
 
-    const sanitized = { ...body };
+    const sanitized = { ...body }
 
     // Remove sensitive fields
     const sensitiveFields = [
@@ -328,36 +328,36 @@ class MonitoringMiddleware {
       'key',
       'apiKey',
       'authToken',
-    ];
+    ]
 
     const sanitizeObject = (obj) => {
-      if (typeof obj !== 'object' || obj === null) return obj;
+      if (typeof obj !== 'object' || obj === null) return obj
 
-      const result = {};
+      const result = {}
       for (const [key, value] of Object.entries(obj)) {
         if (
           sensitiveFields.some((field) =>
             key.toLowerCase().includes(field.toLowerCase())
           )
         ) {
-          result[key] = '[REDACTED]';
+          result[key] = '[REDACTED]'
         } else if (typeof value === 'object') {
-          result[key] = sanitizeObject(value);
+          result[key] = sanitizeObject(value)
         } else {
-          result[key] = value;
+          result[key] = value
         }
       }
-      return result;
-    };
+      return result
+    }
 
-    return sanitizeObject(sanitized);
+    return sanitizeObject(sanitized)
   }
 
   /**
    * Generate unique request ID
    */
   generateRequestId() {
-    return `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    return `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
   }
 
   /**
@@ -370,14 +370,14 @@ class MonitoringMiddleware {
       this.securityMonitoring(),
       this.apiUsageMonitoring(),
       this.rateLimitMonitoring(),
-    ];
+    ]
   }
 
   /**
    * Get error handling middleware
    */
   getErrorMiddleware() {
-    return this.errorTracking();
+    return this.errorTracking()
   }
 
   /**
@@ -385,12 +385,12 @@ class MonitoringMiddleware {
    */
   async cleanup() {
     if (this.errorTracking) {
-      this.errorTracking.cleanup();
+      this.errorTracking.cleanup()
     }
     if (this.performanceMetrics) {
-      this.performanceMetrics.cleanup();
+      this.performanceMetrics.cleanup()
     }
   }
 }
 
-module.exports = MonitoringMiddleware;
+module.exports = MonitoringMiddleware

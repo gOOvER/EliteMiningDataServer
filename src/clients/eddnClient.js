@@ -1,35 +1,35 @@
-const zmq = require('zeromq');
-const zlib = require('zlib');
-const EventEmitter = require('events');
-const logger = require('../services/logger');
+const zmq = require('zeromq')
+const zlib = require('zlib')
+const EventEmitter = require('events')
+const logger = require('../services/logger')
 
 class EDDNClient extends EventEmitter {
   constructor(config) {
-    super();
-    this.relayUrl = config.relayUrl || 'tcp://eddn.edcd.io:9500';
-    this.reconnectInterval = config.reconnectInterval || 30000;
-    this.socket = null;
-    this.isConnected = false;
-    this.reconnectTimer = null;
-    this.messageCount = 0;
-    this.startTime = Date.now();
+    super()
+    this.relayUrl = config.relayUrl || 'tcp://eddn.edcd.io:9500'
+    this.reconnectInterval = config.reconnectInterval || 30000
+    this.socket = null
+    this.isConnected = false
+    this.reconnectTimer = null
+    this.messageCount = 0
+    this.startTime = Date.now()
   }
 
   async connect() {
     try {
-      this.socket = new zmq.Subscriber();
-      this.socket.connect(this.relayUrl);
-      this.socket.subscribe('');
+      this.socket = new zmq.Subscriber()
+      this.socket.connect(this.relayUrl)
+      this.socket.subscribe('')
 
-      logger.info(`EDDN: Connecting to ${this.relayUrl}`);
+      logger.info(`EDDN: Connecting to ${this.relayUrl}`)
 
       // Listen for messages
       for await (const [, message] of this.socket) {
-        this.handleMessage(message);
+        this.handleMessage(message)
       }
     } catch (error) {
-      logger.error('EDDN: Connection error:', error);
-      this.scheduleReconnect();
+      logger.error('EDDN: Connection error:', error)
+      this.scheduleReconnect()
     }
   }
 
@@ -37,53 +37,53 @@ class EDDNClient extends EventEmitter {
     try {
       // Check if message is valid
       if (!compressedMessage) {
-        logger.warn('EDDN: Received empty message');
-        return;
+        logger.warn('EDDN: Received empty message')
+        return
       }
 
       // Decompress the message
-      const decompressed = zlib.inflateSync(compressedMessage);
-      const data = JSON.parse(decompressed.toString('utf8'));
+      const decompressed = zlib.inflateSync(compressedMessage)
+      const data = JSON.parse(decompressed.toString('utf8'))
 
-      this.messageCount++;
+      this.messageCount++
 
       // Filter for mining-relevant messages
       if (this.isMiningRelevant(data)) {
-        this.emit('miningData', data);
+        this.emit('miningData', data)
       }
 
       // Emit all data for other uses
-      this.emit('data', data);
+      this.emit('data', data)
 
       // Log statistics every 1000 messages
       if (this.messageCount % 1000 === 0) {
-        const uptime = (Date.now() - this.startTime) / 1000;
-        const messagesPerSecond = (this.messageCount / uptime).toFixed(2);
+        const uptime = (Date.now() - this.startTime) / 1000
+        const messagesPerSecond = (this.messageCount / uptime).toFixed(2)
         logger.info(
           `EDDN: Processed ${this.messageCount} messages (${messagesPerSecond} msg/s)`
-        );
+        )
       }
     } catch (error) {
-      logger.error('EDDN: Message parsing error:', error);
+      logger.error('EDDN: Message parsing error:', error)
     }
   }
 
   isMiningRelevant(data) {
-    const schema = data.$schemaRef;
-    const message = data.message;
-    const header = data.header;
+    const schema = data.$schemaRef
+    const message = data.message
+    const header = data.header
 
     if (!schema || !message) {
-      return false;
+      return false
     }
 
     // Extract schema type from URL (based on EDDN documentation)
-    const schemaMatch = schema.match(/\/schemas\/([^/]+)\/(\d+)/);
+    const schemaMatch = schema.match(/\/schemas\/([^/]+)\/(\d+)/)
     if (!schemaMatch) {
-      return false;
+      return false
     }
 
-    const schemaType = schemaMatch[1];
+    const schemaType = schemaMatch[1]
     // const schemaVersion = parseInt(schemaMatch[2])
 
     // Mining-relevant schema types based on EDDN documentation
@@ -94,10 +94,10 @@ class EDDNClient extends EventEmitter {
       'shipyard', // Mining ship availability
       'fsssignaldiscovered', // Fleet Carrier signals (mining locations)
       'navbeaconscan', // Navigation beacon data
-    ];
+    ]
 
     if (!miningSchemas.includes(schemaType)) {
-      return false;
+      return false
     }
 
     // Enhanced filtering for journal events (based on EDDN dev docs)
@@ -143,16 +143,16 @@ class EDDNClient extends EventEmitter {
         // SRV operations for surface mining
         'LaunchSRV',
         'DockSRV',
-      ];
+      ]
 
       if (!miningEvents.includes(message.event)) {
-        return false;
+        return false
       }
 
       // Additional filtering for market transactions
       if (message.event === 'MarketSell' || message.event === 'MarketBuy') {
-        const commodity = message.Type;
-        return this.isMiningCommodity(commodity);
+        const commodity = message.Type
+        return this.isMiningCommodity(commodity)
       }
     }
 
@@ -162,7 +162,7 @@ class EDDNClient extends EventEmitter {
         // Check if any commodity is mining-related
         return message.commodities.some((commodity) =>
           this.isMiningCommodity(commodity.name)
-        );
+        )
       }
     }
 
@@ -170,17 +170,17 @@ class EDDNClient extends EventEmitter {
     if ((schemaType === 'outfitting' || schemaType === 'shipyard') && header) {
       // Prefer Odyssey/Horizons data for better mining equipment info
       if (message.horizons || message.odyssey) {
-        return true;
+        return true
       }
     }
 
-    return true;
+    return true
   }
 
   isMiningCommodity(commodityName) {
-    if (!commodityName) return false;
+    if (!commodityName) return false
 
-    const name = commodityName.toLowerCase();
+    const name = commodityName.toLowerCase()
 
     // Comprehensive list of mining commodities (from Elite Dangerous data)
     const miningCommodities = [
@@ -243,48 +243,48 @@ class EDDNClient extends EventEmitter {
       'tin',
       'aluminum',
       'lead',
-    ];
+    ]
 
     return miningCommodities.some(
       (commodity) => name.includes(commodity) || commodity.includes(name)
-    );
+    )
   }
 
   scheduleReconnect() {
     if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
+      clearTimeout(this.reconnectTimer)
     }
 
     this.reconnectTimer = setTimeout(() => {
-      logger.info('EDDN: Attempting to reconnect...');
-      this.connect();
-    }, this.reconnectInterval);
+      logger.info('EDDN: Attempting to reconnect...')
+      this.connect()
+    }, this.reconnectInterval)
   }
 
   disconnect() {
     if (this.socket) {
-      this.socket.close();
-      this.socket = null;
+      this.socket.close()
+      this.socket = null
     }
 
     if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
     }
 
-    this.isConnected = false;
-    logger.info('EDDN: Disconnected');
+    this.isConnected = false
+    logger.info('EDDN: Disconnected')
   }
 
   getStatistics() {
-    const uptime = (Date.now() - this.startTime) / 1000;
+    const uptime = (Date.now() - this.startTime) / 1000
     return {
       connected: this.isConnected,
       messageCount: this.messageCount,
       uptime,
       messagesPerSecond: (this.messageCount / uptime).toFixed(2),
-    };
+    }
   }
 }
 
-module.exports = EDDNClient;
+module.exports = EDDNClient
