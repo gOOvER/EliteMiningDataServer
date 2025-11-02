@@ -11,6 +11,8 @@
     "test:integration": "jest tests/integration --ci --watchAll=false",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "wait-for-services": "node scripts/wait-for-services.js",
+    "health-check": "node scripts/health-check.js",
     "lint": "eslint src/",
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
