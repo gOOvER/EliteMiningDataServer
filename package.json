@@ -15,6 +15,8 @@
     "test:coverage": "jest --coverage",
     "test:memory-leaks": "echo 'Memory leak tests not yet implemented' && exit 0",
     "test:load": "jest tests/load --ci --watchAll=false --forceExit --testTimeout=60000",
+    "test:load:k6": "k6 run tests/load/api-load-test.js",
+    "test:load:k6:short": "k6 run --duration=30s --vus=10 tests/load/api-load-test.js",
     "wait-for-services": "node scripts/wait-for-services.js",
     "health-check": "node scripts/health-check.js",
     "type-check": "echo 'TypeScript type checking not configured (JavaScript project)' && exit 0",
