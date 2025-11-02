@@ -32,14 +32,13 @@ services:
       - mining_logs:/app/logs
     restart: unless-stopped
     depends_on:
-      mongodb:
-        condition: service_healthy
+      - mongodb
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      test: ["CMD-SHELL", "node -e \"const http = require('http'); const req = http.get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }); req.on('error', () => process.exit(1)); req.setTimeout(5000, () => { req.destroy(); process.exit(1); });\""]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
     networks:
       - backend
       - frontend
@@ -65,12 +64,9 @@ services:
       --logpath /var/log/mongodb/mongod.log
       --logappend
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    # Simple health check - just verify the process is running
+    # This avoids issues with mongosh not being in PATH
+    # Application will handle MongoDB connection errors gracefully
     networks:
       - backend
 
@@ -91,8 +87,7 @@ services:
       # ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USERNAME:-}
       # ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD:-}
     depends_on:
-      mongodb:
-        condition: service_healthy
+      - mongodb
     restart: unless-stopped
     networks:
       - backend

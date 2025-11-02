@@ -38,7 +38,7 @@ class DataProcessor {
       // Extract station and system information
       const stationName = message.stationName
       const systemName = message.systemName
-      const timestamp = message.timestamp
+      // const timestamp = data.message?.timestamp || data.timestamp || new Date().toISOString()
 
       // Store station if not exists
       await this.storeStation({

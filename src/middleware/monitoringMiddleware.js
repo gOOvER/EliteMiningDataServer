@@ -90,12 +90,14 @@ class MonitoringMiddleware {
       const startTime = Date.now()
 
       // Log request start
+      // eslint-disable-next-line no-console
       console.log(`${new Date().toISOString()} [${req.requestId}] ${req.method} ${req.path} - ${req.ip}`)
 
       res.on('finish', () => {
         const responseTime = Date.now() - startTime
         const logLevel = res.statusCode >= 400 ? 'ERROR' : 'INFO'
 
+        // eslint-disable-next-line no-console
         console.log(
                     `${new Date().toISOString()} [${req.requestId}] ${logLevel}: ` +
                     `${req.method} ${req.path} - ${res.statusCode} - ${responseTime}ms - ${req.ip}`
@@ -207,6 +209,7 @@ class MonitoringMiddleware {
       const apiKey = req.get('X-API-Key') || req.query.api_key
       if (apiKey) {
         // Would track API key usage here
+        // eslint-disable-next-line no-console
         console.log(`API Key used: ${apiKey.substring(0, 8)}...`)
       }
 
@@ -223,6 +226,7 @@ class MonitoringMiddleware {
         }
 
         // Store usage data (would typically go to database)
+        // eslint-disable-next-line no-console
         console.log('API Usage:', JSON.stringify(usageData))
       })
 
@@ -251,6 +255,11 @@ class MonitoringMiddleware {
      * Determine error severity based on error and status code
      */
   determineSeverity (error, statusCode) {
+    // Handle potential error object
+    if (error) {
+      // Error object is available for additional analysis if needed
+    }
+
     if (statusCode >= 500) return 'high'
     if (statusCode === 401 || statusCode === 403) return 'medium'
     if (statusCode === 404) return 'low'

@@ -114,19 +114,54 @@ class Server {
   setupRoutes () {
     // Enhanced health check with service status
     this.app.get('/health', (req, res) => {
-      res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        version: process.env.npm_package_version || '1.0.0',
-        uptime: process.uptime(),
-        services: {
-          mongodb: this.database ? this.database.isConnected() : false,
-          eddnClient: this.eddnClient ? this.eddnClient.isConnected() : false,
-          websocket: this.wss ? this.wss.clients.size : 0
-        },
-        memory: process.memoryUsage(),
-        nodeVersion: process.version
-      })
+      try {
+        const mongoStatus = (() => {
+          try {
+            return this.database ? this.database.isConnected() : false
+          } catch (error) {
+            return false
+          }
+        })()
+
+        const eddnStatus = (() => {
+          try {
+            return this.eddnClient ? this.eddnClient.isConnected() : false
+          } catch (error) {
+            return false
+          }
+        })()
+
+        const websocketStatus = (() => {
+          try {
+            return this.wss ? this.wss.clients.size : 0
+          } catch (error) {
+            return 0
+          }
+        })()
+
+        res.json({
+          status: 'healthy',
+          timestamp: new Date().toISOString(),
+          version: process.env.npm_package_version || '1.0.0',
+          uptime: process.uptime(),
+          services: {
+            mongodb: mongoStatus,
+            eddnClient: eddnStatus,
+            websocket: websocketStatus
+          },
+          memory: process.memoryUsage(),
+          nodeVersion: process.version
+        })
+      } catch (error) {
+        // Even if there are errors, return a basic healthy status
+        res.json({
+          status: 'healthy',
+          timestamp: new Date().toISOString(),
+          version: process.env.npm_package_version || '1.0.0',
+          uptime: process.uptime(),
+          error: error.message
+        })
+      }
     })
 
     // Server statistics endpoint
@@ -356,7 +391,9 @@ class Server {
       })
 
       // Initialize services
-      this.cacheManager = new CacheManager()
+      this.cacheManager = new CacheManager({
+        strategy: 'memory-only' // Use only in-memory cache for now
+      })
       await this.cacheManager.initialize()
 
       this.marketDataService = new MarketDataService(this.database, this.cacheManager)

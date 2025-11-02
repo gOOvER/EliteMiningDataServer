@@ -31,13 +31,10 @@ class MongoService {
         minPoolSize: 5,
         maxIdleTimeMS: 30000,
         serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000,
-        // Compression for large datasets
-        compressors: ['zstd', 'zlib'],
-        // Connection optimization
-        bufferMaxEntries: 0,
-        useNewUrlParser: true,
-        useUnifiedTopology: true
+        socketTimeoutMS: 45000
+        // Compression disabled to avoid optional dependency issues
+        // Can be re-enabled by installing @mongodb-js/zstd and @mongodb-js/zlib
+        // compressors: ['zstd', 'zlib']
       })
 
       await this.client.connect()

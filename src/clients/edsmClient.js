@@ -37,7 +37,7 @@ class EDSMClient {
         const now = Date.now()
         const timeSinceLastRequest = now - this.lastRequestTime
         if (timeSinceLastRequest < this.rateLimitDelay) {
-          await new Promise(res => setTimeout(res, this.rateLimitDelay - timeSinceLastRequest))
+          await new Promise(resolve => setTimeout(resolve, this.rateLimitDelay - timeSinceLastRequest))
         }
 
         const response = await this.executeRequest(url, params)

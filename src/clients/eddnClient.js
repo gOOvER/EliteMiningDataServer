@@ -24,7 +24,7 @@ class EDDNClient extends EventEmitter {
       logger.info(`EDDN: Connecting to ${this.relayUrl}`)
 
       // Listen for messages
-      for await (const [topic, message] of this.socket) {
+      for await (const [, message] of this.socket) {
         this.handleMessage(message)
       }
     } catch (error) {
@@ -35,6 +35,12 @@ class EDDNClient extends EventEmitter {
 
   handleMessage (compressedMessage) {
     try {
+      // Check if message is valid
+      if (!compressedMessage) {
+        logger.warn('EDDN: Received empty message')
+        return
+      }
+
       // Decompress the message
       const decompressed = zlib.inflateSync(compressedMessage)
       const data = JSON.parse(decompressed.toString('utf8'))
@@ -70,13 +76,13 @@ class EDDNClient extends EventEmitter {
     }
 
     // Extract schema type from URL (based on EDDN documentation)
-    const schemaMatch = schema.match(/\/schemas\/([^\/]+)\/(\d+)/)
+    const schemaMatch = schema.match(/\/schemas\/([^/]+)\/(\d+)/)
     if (!schemaMatch) {
       return false
     }
 
     const schemaType = schemaMatch[1]
-    const schemaVersion = parseInt(schemaMatch[2])
+    // const schemaVersion = parseInt(schemaMatch[2])
 
     // Mining-relevant schema types based on EDDN documentation
     const miningSchemas = [

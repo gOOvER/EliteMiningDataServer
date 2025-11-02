@@ -765,6 +765,7 @@ setInterval(async () => {
     const healthStatus = await healthCheck.performHealthCheck()
     await alerting.checkAlertRules(healthStatus, 'health')
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Periodic health check failed:', error)
   }
 }, 60000) // Every minute

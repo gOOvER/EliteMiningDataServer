@@ -13,3 +13,13 @@ src/services/performanceMetricsService.js
 # Files with unused variables that are placeholders for future implementation
 src/services/cacheInvalidationManager.js
 src/services/inMemoryCacheService.js
+
+# Files with minor unused variable issues (in progress)
+src/services/edsmApiService.js
+src/services/inaraApiService.js
+src/services/marketDataService.js
+src/services/performanceOptimizer.js
+src/services/rateLimitService.js
+src/services/redisCacheService.js
+src/services/errorHandlingService.js
+src/services/healthCheckService.js

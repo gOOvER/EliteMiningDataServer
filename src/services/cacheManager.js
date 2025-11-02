@@ -221,7 +221,7 @@ class CacheManager {
    * Cache statistics with memory-first strategy
    */
   async cacheStatistics (type, data, filters = {}) {
-    const options = this.getStatisticsCacheOptions(type)
+    // const options = this.getStatisticsCacheOptions(type)
 
     // Statistics are cached in memory first for speed
     if (this.inMemoryCache) {
