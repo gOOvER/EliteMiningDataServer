@@ -608,6 +608,75 @@ docker compose exec crowdsec cscli decisions list
 for i in {1..100}; do curl http://elite-mining.localhost/api/health; done
 ```
 
+### Load Testing
+
+The project includes comprehensive k6 load testing for performance validation:
+
+#### **Install k6**
+
+```bash
+# Windows (PowerShell)
+choco install k6
+winget install k6.k6
+
+# macOS
+brew install k6
+
+# Linux
+sudo apt install k6
+```
+
+#### **Available Load Tests**
+
+```bash
+# Full Elite Mining API test (requires server running)
+npm run test:load:k6
+
+# Quick 30-second test
+npm run test:load:k6:short
+
+# CI-friendly test with fallback
+npm run test:load:k6:ci
+
+# Demo test (works without server)
+npm run test:load:k6:demo
+```
+
+#### **Custom Load Tests**
+
+```bash
+# Start server first
+npm start
+# or
+make dev
+
+# Run with custom parameters
+k6 run tests/load/api-load-test.js --duration 60s --vus 20
+
+# Test specific endpoints
+TEST_BASE_URL=http://localhost:3000 k6 run tests/load/api-load-test-ci.js
+```
+
+#### **Load Test Reports**
+
+k6 provides detailed performance metrics:
+
+- **Response Times**: P50, P95, P99 percentiles
+- **Throughput**: Requests per second
+- **Error Rates**: Failed request percentage
+- **Resource Usage**: Virtual users and iterations
+
+**Example Output:**
+```
+✓ http_req_duration..........: avg=245ms p(95)=680ms
+✓ http_req_failed............: 0.15% ✓ 8 ✗ 5234
+✓ http_reqs..................: 5242 17.47/s
+✓ vus........................: 50 min=0 max=50
+```
+
+**GitHub Actions Integration:**
+Load tests automatically run in CI/CD pipeline with intelligent fallback for environments without full server access.
+
 ## 📚 Documentation
 
 - **[Traefik Setup Guide](docs/TRAEFIK_SETUP.md)** - Reverse proxy configuration

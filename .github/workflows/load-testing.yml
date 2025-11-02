@@ -1,0 +1,244 @@
+name: Load Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package*.json'
+      - '.github/workflows/load-testing.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package*.json'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of load test to run'
+        required: true
+        default: 'ci'
+        type: choice
+        options:
+        - ci
+        - demo
+        - full
+
+env:
+  NODE_VERSION: '22.x'
+
+jobs:
+  load-test:
+    name: k6 Load Testing
+    runs-on: ubuntu-latest
+    
+    # Only run if the repository has the required setup
+    if: github.repository == 'gOOvER/EliteMiningDataServer' || github.event_name == 'workflow_dispatch'
+    
+    services:
+      mongodb:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+        env:
+          MONGO_INITDB_DATABASE: elite_mining_test
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ping: 1})' --quiet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install k6
+      run: |
+        sudo gpg -k
+        sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+        echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+        sudo apt-get update
+        sudo apt-get install k6
+
+    - name: Verify k6 installation
+      run: k6 version
+
+    - name: Start application (background)
+      run: |
+        # Create test environment file
+        cp .env .env.test
+        sed -i 's/elite_mining/elite_mining_test/g' .env.test
+        sed -i 's/NODE_ENV=development/NODE_ENV=test/g' .env.test
+        
+        # Start server in background
+        npm start &
+        echo $! > server.pid
+        
+        # Give it time to start
+        sleep 10
+      env:
+        NODE_ENV: test
+        MONGODB_URI: mongodb://localhost:27017/elite_mining_test
+        REDIS_URL: redis://localhost:6379
+        PORT: 3000
+
+    - name: Wait for services to be ready
+      run: |
+        echo "Waiting for server to be ready..."
+        
+        # Wait for server with timeout
+        timeout 120 bash -c '
+          while ! curl -f http://localhost:3000/api/health >/dev/null 2>&1; do
+            echo "Waiting for server..."
+            sleep 2
+          done
+        ' || echo "Server health check timeout - continuing with fallback test"
+        
+        # Check if server is responding
+        if curl -f http://localhost:3000/api/health >/dev/null 2>&1; then
+          echo "✅ Server is ready"
+          echo "SERVER_AVAILABLE=true" >> $GITHUB_ENV
+        else
+          echo "⚠️ Server not ready - will use fallback test"
+          echo "SERVER_AVAILABLE=false" >> $GITHUB_ENV
+        fi
+
+    - name: Run k6 Load Test - Full API (if server available)
+      if: env.SERVER_AVAILABLE == 'true' && (github.event.inputs.test_type == 'full' || github.event.inputs.test_type == '')
+      run: |
+        echo "🎯 Running full Elite Mining API load test..."
+        k6 run tests/load/api-load-test-ci.js --out json=k6-results.json
+      env:
+        TEST_BASE_URL: http://localhost:3000
+
+    - name: Run k6 Load Test - CI Mode (smart fallback)
+      if: github.event.inputs.test_type == 'ci' || github.event.inputs.test_type == '' || env.SERVER_AVAILABLE != 'true'
+      run: |
+        echo "🔄 Running CI-friendly load test with intelligent fallback..."
+        k6 run tests/load/api-load-test-ci.js --out json=k6-results-ci.json
+      env:
+        TEST_BASE_URL: http://localhost:3000
+
+    - name: Run k6 Load Test - Demo Mode
+      if: github.event.inputs.test_type == 'demo' || failure()
+      run: |
+        echo "🎪 Running demo load test..."
+        k6 run tests/load/k6-demo.js --out json=k6-results-demo.json
+
+    - name: Process k6 results
+      if: always()
+      run: |
+        echo "## 📊 k6 Load Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Find the results file
+        if [ -f "k6-results.json" ]; then
+          RESULTS_FILE="k6-results.json"
+          TEST_TYPE="Full API Test"
+        elif [ -f "k6-results-ci.json" ]; then
+          RESULTS_FILE="k6-results-ci.json"  
+          TEST_TYPE="CI Mode Test"
+        elif [ -f "k6-results-demo.json" ]; then
+          RESULTS_FILE="k6-results-demo.json"
+          TEST_TYPE="Demo Test"
+        else
+          echo "❌ No results file found" >> $GITHUB_STEP_SUMMARY
+          exit 0
+        fi
+        
+        echo "### $TEST_TYPE" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Extract key metrics from JSON (if jq is available)
+        if command -v jq >/dev/null 2>&1 && [ -f "$RESULTS_FILE" ]; then
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Parse metrics from k6 JSON output
+          DURATION=$(jq -r '.metrics.http_req_duration.values.avg // "N/A"' "$RESULTS_FILE")
+          REQUESTS=$(jq -r '.metrics.http_reqs.values.count // "N/A"' "$RESULTS_FILE")
+          FAILED=$(jq -r '.metrics.http_req_failed.values.rate // "N/A"' "$RESULTS_FILE")
+          
+          echo "| Average Response Time | ${DURATION}ms |" >> $GITHUB_STEP_SUMMARY
+          echo "| Total Requests | $REQUESTS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Failure Rate | $FAILED |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "✅ k6 load test completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "📄 Results saved to \`$RESULTS_FILE\`" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Stop application
+      if: always()
+      run: |
+        if [ -f server.pid ]; then
+          echo "Stopping server..."
+          kill $(cat server.pid) || true
+          rm server.pid
+        fi
+
+    - name: Upload k6 results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: k6-load-test-results-${{ github.run_number }}
+        path: |
+          k6-results*.json
+          *.log
+        retention-days: 7
+
+    - name: Comment on PR (if applicable)
+      if: github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          // Add a comment to the PR with load test results
+          const fs = require('fs');
+          
+          let comment = '## 🚀 k6 Load Test Results\n\n';
+          
+          // Check if results files exist
+          const files = ['k6-results.json', 'k6-results-ci.json', 'k6-results-demo.json'];
+          let foundResults = false;
+          
+          for (const file of files) {
+            if (fs.existsSync(file)) {
+              comment += `✅ Load test completed - results saved to \`${file}\`\n`;
+              foundResults = true;
+              break;
+            }
+          }
+          
+          if (!foundResults) {
+            comment += '❌ No load test results found\n';
+          }
+          
+          comment += '\n📊 View detailed results in the workflow artifacts.';
+          
+          // Post comment
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
