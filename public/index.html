@@ -15,9 +15,15 @@
     <header class="header">
         <div class="container">
             <h1><i class="fas fa-rocket"></i> Elite Mining Data Server</h1>
-            <div class="status-indicator" id="connectionStatus">
+            <div class="header-actions">
+                <div class="status-indicator" id="connectionStatus">
                 <span class="status-dot" id="statusDot"></span>
                 <span id="statusText">Connecting...</span>
+            </div>
+                <div class="auth-actions" id="authActions">
+                    <a href="#" id="loginBtn" class="btn btn-login"><i class="fas fa-sign-in-alt"></i> Login</a>
+                    <a href="#" id="logoutBtn" class="btn btn-logout" style="display:none"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                </div>
             </div>
         </div>
     </header>
@@ -347,6 +353,39 @@
                 </div>
             </section>
 
+            <!-- Hotspot Übersicht Section -->
+            <section class="hotspot-section">
+                <div class="card full-width">
+                    <div class="card-header">
+                        <h3><i class="fas fa-map-marker-alt"></i> Mining Hotspots Übersicht</h3>
+                        <div class="card-actions">
+                            <button class="btn-refresh" id="refreshHotspots">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="table-container">
+                            <table class="data-table" id="hotspotTable">
+                                <thead>
+                                    <tr>
+                                        <th>System</th>
+                                        <th>Hotspot</th>
+                                        <th>Typ</th>
+                                        <th>Koordinaten</th>
+                                        <th>Upload</th>
+                                        <th>User</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Hotspot-Daten werden per JS geladen -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- System Logs Section -->
             <section class="logs-section">
                 <div class="card full-width">
@@ -376,5 +415,7 @@
     </main>
 
     <script src="/js/dashboard.js"></script>
+    <script src="/js/hotspots.js"></script>
+    <script src="/js/auth.js"></script>
 </body>
 </html>
